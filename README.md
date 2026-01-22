@@ -650,8 +650,9 @@ stitch-mcp-auto/
 
 ## Credits
 
-- **Author:** greensheep01201 (Wongil Seo)
-- **Inspired by:** Kargatharaakash [stitch-mcp](https://github.com/Kargatharaakash/stitch-mcp)
+- **Author:** [Wongil Seo](https://github.com/GreenSheep01201)
+- **Based on:** [stitch-mcp](https://github.com/Kargatharaakash/stitch-mcp) by [Kargatharaakash](https://github.com/Kargatharaakash)
+- **Concept:** Automated implementation of the MCP (Model Context Protocol) file stitching system.
 
 ---
 
