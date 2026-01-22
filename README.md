@@ -576,19 +576,19 @@ npx -p stitch-mcp-auto stitch-mcp-auto-setup
                               ▼
 ┌──────────────────────────────────────────────────────────────┐
 │                     stitch-mcp-auto                          │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐          │
-│  │ setup.js    │  │ index.js    │  │ auth.js     │          │
-│  │ (Auto Setup)│  │ (MCP Server)│  │ (OAuth)     │          │
-│  └─────────────┘  └─────────────┘  └─────────────┘          │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐           │
+│  │ setup.js    │  │ index.js    │  │ auth.js     │           │
+│  │ (Auto Setup)│  │ (MCP Server)│  │ (OAuth)     │           │
+│  └─────────────┘  └─────────────┘  └─────────────┘           │
 └──────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌──────────────────────────────────────────────────────────────┐
 │                    Google Cloud Platform                     │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐          │
-│  │ gcloud CLI  │  │ OAuth 2.0   │  │ Stitch API  │          │
-│  │ (Auth)      │  │ (Token)     │  │ (UI Gen)    │          │
-│  └─────────────┘  └─────────────┘  └─────────────┘          │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐           │
+│  │ gcloud CLI  │  │ OAuth 2.0   │  │ Stitch API  │           │
+│  │ (Auth)      │  │ (Token)     │  │ (UI Gen)    │           │
+│  └─────────────┘  └─────────────┘  └─────────────┘           │
 └──────────────────────────────────────────────────────────────┘
 ```
 
@@ -650,7 +650,8 @@ stitch-mcp-auto/
 
 ## Credits
 
-- **Author:** greensheep01201 (Seo Won-gil)
+- **Author:** greensheep01201 (Wongil Seo)
+- **Inspired by:** Kargatharaakash [stitch-mcp](https://github.com/Kargatharaakash/stitch-mcp)
 
 ---
 
