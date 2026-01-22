@@ -1,0 +1,38 @@
+# Dependencies
+node_modules/
+
+# Environment variables and keys
+.env
+stitch-key.json
+*.key
+*.pem
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+logs/
+*.log
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Temporary scripts (just in case)
+list_tools.js
+test_*.js
+gen_url.js
+
+# Sisyphus agent state
+.sisyphus/

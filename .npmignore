@@ -1,0 +1,6 @@
+# Don't publish these
+node_modules/
+.sisyphus/
+stitch-key.json
+*.tgz
+.DS_Store
