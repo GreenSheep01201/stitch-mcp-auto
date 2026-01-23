@@ -24,6 +24,7 @@ const os = require("os");
 const http = require("http");
 const url = require("url");
 const fetch = require("node-fetch");
+const sharp = require("sharp");
 
 const STITCH_URL = "https://stitch.googleapis.com/mcp";
 const TIMEOUT_MS = 180000;
@@ -37,6 +38,24 @@ const OAUTH_SCOPES = [
     'https://www.googleapis.com/auth/userinfo.email'
 ];
 
+// ============= Antigravity OAuth 설정 (이미지 생성용) =============
+const ANTIGRAVITY_CLIENT_ID = '1071006060591-tmhssin2h21lcre235vtolojh4g403ep.apps.googleusercontent.com';
+const ANTIGRAVITY_CLIENT_SECRET = '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';
+const ANTIGRAVITY_REDIRECT_URI = 'http://localhost:51121/oauth-callback';
+const ANTIGRAVITY_SCOPES = [
+    'https://www.googleapis.com/auth/cloud-platform',
+    'https://www.googleapis.com/auth/userinfo.email',
+    'https://www.googleapis.com/auth/userinfo.profile',
+    'https://www.googleapis.com/auth/cclog',
+    'https://www.googleapis.com/auth/experimentsandconfigs'
+];
+const ANTIGRAVITY_ENDPOINTS = {
+    daily: 'https://daily-cloudcode-pa.sandbox.googleapis.com',
+    autopush: 'https://autopush-cloudcode-pa.sandbox.googleapis.com',
+    prod: 'https://cloudcode-pa.googleapis.com'
+};
+const ANTIGRAVITY_TOKEN_PATH = path.join(os.homedir(), '.stitch-mcp-auto', 'antigravity_tokens.json');
+
 // 설정 경로
 const CONFIG_DIR = path.join(os.homedir(), '.stitch-mcp-auto');
 const TOKEN_PATH = path.join(CONFIG_DIR, 'tokens.json');
@@ -45,6 +64,161 @@ const CONFIG_PATH = path.join(CONFIG_DIR, 'config.json');
 // 포트 설정
 const AUTH_PORT = 8085;
 const SETUP_PORT = 8086;
+
+// ============= 시스템 로케일 감지 =============
+function getSystemLocale() {
+    // 환경 변수에서 언어 감지 (우선순위: LANG > LC_ALL > LC_MESSAGES)
+    const langEnv = process.env.LANG || process.env.LC_ALL || process.env.LC_MESSAGES || '';
+    if (langEnv.toLowerCase().startsWith('ko')) return 'ko';
+
+    // Windows 시스템 로케일 확인
+    if (os.platform() === 'win32') {
+        try {
+            const locale = execSync('powershell -command "[System.Globalization.CultureInfo]::CurrentCulture.Name"', {
+                encoding: 'utf8',
+                stdio: 'pipe',
+                timeout: 3000
+            }).trim();
+            if (locale.toLowerCase().startsWith('ko')) return 'ko';
+        } catch (e) {}
+    }
+
+    return 'en';
+}
+
+// 현재 시스템 로케일 캐시
+const systemLocale = getSystemLocale();
+
+// 로그 메시지 i18n
+const logMessages = {
+    en: {
+        browserGoogleLogin: 'Google login in browser...',
+        authWaiting: 'Waiting for authentication...',
+        usingGcloudToken: 'Using gcloud CLI token',
+        couldNotFetchAntigravityProjectId: 'Could not fetch Antigravity project ID',
+        antigravityOAuthServerStarted: 'Antigravity OAuth server started (port 51121)',
+        openUrlInBrowser: 'Please open the following URL in your browser:',
+        antigravityTokenRefreshFailed: 'Antigravity token refresh failed, re-authentication required',
+        backgroundRemovalComplete: 'Background removal complete - Original: {0}KB → Result: {1}KB',
+        backgroundRemovalFailed: 'Background removal failed: {0}',
+        detectedBackgroundColor: 'Detected background color: RGB({0}, {1}, {2})',
+        autoBackgroundRemovalComplete: 'Auto background removal complete',
+        autoBackgroundRemovalFailed: 'Auto background removal failed: {0}',
+        endpointFailed: 'Endpoint {0} failed: {1}',
+        setupWizardStarting: 'Starting setup wizard...',
+        usingExistingConfig: 'Using existing config: {0}',
+        existingProjectFound: 'Existing project found: {0}',
+        projectVerified: 'Project verified: {0}',
+        setupWizardUrl: 'Setup wizard: http://localhost:{0}',
+        serverVersion: 'Stitch MCP Server v2.2.0 - {0}',
+        oauthAuthenticating: 'OAuth authenticating...',
+        oauthComplete: 'OAuth authentication complete',
+        projectConfiguring: 'Configuring project...',
+        projectSet: 'Project: {0}',
+        mcpServerStarting: 'Starting MCP server...',
+        imageGenStarting: '🎨 Starting image generation: {0}{1}',
+        withBackgroundRemoval: ' (background removal enabled)',
+        antigravityGenerating: '  📡 Generating image with Antigravity/Gemini 3 Pro...',
+        antigravityAuthStarting: '  🔐 Starting Antigravity authentication (browser)...',
+        processingBackgroundRemoval: '  🔲 Processing background removal...',
+        backgroundRemovalDone: '  ✅ Background removal complete',
+        backgroundRemovalWarn: '  ⚠️ Background removal failed: {0}',
+        imageSaved: 'Image saved: {0}',
+        orchestrationStarting: '🎭 Starting design orchestration: {0}',
+        autoBackgroundRemovalDone: '    🔲 Auto background removal complete',
+        autoBackgroundRemovalWarn: '    ⚠️ Background removal failed: {0}',
+        antigravityGeneratingAssets: '  📡 Generating image assets with Antigravity/Gemini 3 Pro...',
+        antigravityAuthStartingAssets: '  🔐 Starting Antigravity authentication (browser)...',
+        antigravityNotAuthSkipping: '  ⚠️ Antigravity not authenticated - skipping asset generation, creating UI only.',
+        antigravityNotAuthTip: '  💡 To generate assets, use the forceAntigravityAuth: true option.',
+        generatingLogo: '  🎨 Generating logo...',
+        logoGenComplete: '  ✅ Logo generation complete: {0}',
+        generatingHero: '  🎨 Generating hero image...',
+        heroGenComplete: '  ✅ Hero image generation complete: {0}',
+        generatingIcon: '  🎨 Generating icon...',
+        iconGenComplete: '  ✅ Icon generation complete: {0}',
+        generatingCustomAsset: '  🎨 Generating custom asset: {0}',
+        customAssetGenComplete: '  ✅ Custom asset generation complete: {0}',
+        generatingUIWithStitch: '  🖼️ Generating UI with Stitch API...',
+        orchestrationComplete: '🎭 Design orchestration complete!',
+        serverError: 'Server error: {0}',
+        ready: 'Ready! ({0})',
+        fatal: 'Fatal: {0}',
+        // Workspace project messages
+        workspaceProjectFound: '📂 Found existing project in workspace: {0}',
+        workspaceProjectSaved: '💾 Project saved to workspace: {0}',
+        workspaceProjectCleared: '🗑️ Workspace project cleared',
+        noWorkspaceProject: '📂 No project found in current workspace'
+    },
+    ko: {
+        browserGoogleLogin: '브라우저에서 Google 로그인...',
+        authWaiting: '인증 대기 중...',
+        usingGcloudToken: 'gcloud CLI 토큰 사용',
+        couldNotFetchAntigravityProjectId: 'Antigravity 프로젝트 ID를 가져올 수 없습니다',
+        antigravityOAuthServerStarted: 'Antigravity OAuth 서버 시작 (포트 51121)',
+        openUrlInBrowser: '브라우저에서 다음 URL을 열어주세요:',
+        antigravityTokenRefreshFailed: 'Antigravity 토큰 갱신 실패, 재인증 필요',
+        backgroundRemovalComplete: '배경 제거 완료 - 원본: {0}KB → 결과: {1}KB',
+        backgroundRemovalFailed: '배경 제거 실패: {0}',
+        detectedBackgroundColor: '감지된 배경색: RGB({0}, {1}, {2})',
+        autoBackgroundRemovalComplete: '자동 배경 제거 완료',
+        autoBackgroundRemovalFailed: '자동 배경 제거 실패: {0}',
+        endpointFailed: 'Endpoint {0} 실패: {1}',
+        setupWizardStarting: '설정 마법사 시작...',
+        usingExistingConfig: '기존 설정 사용: {0}',
+        existingProjectFound: '기존 프로젝트 발견: {0}',
+        projectVerified: '프로젝트 확인됨: {0}',
+        setupWizardUrl: '설정 마법사: http://localhost:{0}',
+        serverVersion: 'Stitch MCP Server v2.2.0 - {0}',
+        oauthAuthenticating: 'OAuth 인증...',
+        oauthComplete: 'OAuth 인증 완료',
+        projectConfiguring: '프로젝트 설정...',
+        projectSet: '프로젝트: {0}',
+        mcpServerStarting: 'MCP 서버 시작...',
+        imageGenStarting: '🎨 이미지 생성 시작: {0}{1}',
+        withBackgroundRemoval: ' (배경 제거 활성화)',
+        antigravityGenerating: '  📡 Antigravity/Gemini 3 Pro로 이미지 생성...',
+        antigravityAuthStarting: '  🔐 Antigravity 인증 시작 (브라우저)...',
+        processingBackgroundRemoval: '  🔲 배경 제거 처리 중...',
+        backgroundRemovalDone: '  ✅ 배경 제거 완료',
+        backgroundRemovalWarn: '  ⚠️ 배경 제거 실패: {0}',
+        imageSaved: '이미지 저장: {0}',
+        orchestrationStarting: '🎭 디자인 오케스트레이션 시작: {0}',
+        autoBackgroundRemovalDone: '    🔲 배경 자동 제거 완료',
+        autoBackgroundRemovalWarn: '    ⚠️ 배경 제거 실패: {0}',
+        antigravityGeneratingAssets: '  📡 Antigravity/Gemini 3 Pro로 이미지 에셋 생성...',
+        antigravityAuthStartingAssets: '  🔐 Antigravity 인증 시작 (브라우저)...',
+        antigravityNotAuthSkipping: '  ⚠️ Antigravity 미인증 - 에셋 생성 건너뜀, UI만 생성합니다.',
+        antigravityNotAuthTip: '  💡 에셋 생성을 원하면 forceAntigravityAuth: true 옵션을 사용하세요.',
+        generatingLogo: '  🎨 로고 생성 중...',
+        logoGenComplete: '  ✅ 로고 생성 완료: {0}',
+        generatingHero: '  🎨 히어로 이미지 생성 중...',
+        heroGenComplete: '  ✅ 히어로 이미지 생성 완료: {0}',
+        generatingIcon: '  🎨 아이콘 생성 중...',
+        iconGenComplete: '  ✅ 아이콘 생성 완료: {0}',
+        generatingCustomAsset: '  🎨 커스텀 에셋 생성 중: {0}',
+        customAssetGenComplete: '  ✅ 커스텀 에셋 생성 완료: {0}',
+        generatingUIWithStitch: '  🖼️ Stitch API로 UI 생성 중...',
+        orchestrationComplete: '🎭 디자인 오케스트레이션 완료!',
+        serverError: '서버 오류: {0}',
+        ready: '준비 완료! ({0})',
+        fatal: '치명적 오류: {0}',
+        // Workspace project messages
+        workspaceProjectFound: '📂 워크스페이스에서 기존 프로젝트 발견: {0}',
+        workspaceProjectSaved: '💾 프로젝트가 워크스페이스에 저장됨: {0}',
+        workspaceProjectCleared: '🗑️ 워크스페이스 프로젝트 초기화됨',
+        noWorkspaceProject: '📂 현재 워크스페이스에 프로젝트가 없습니다'
+    }
+};
+
+// 로그 메시지 번역 함수
+function logT(key, ...args) {
+    let text = logMessages[systemLocale]?.[key] || logMessages.en[key] || key;
+    args.forEach((arg, i) => {
+        text = text.replace(`{${i}}`, arg);
+    });
+    return text;
+}
 
 // 로깅
 const log = {
@@ -184,7 +358,7 @@ async function authenticateWithBrowser() {
     authUrl.searchParams.set('prompt', 'consent');
     authUrl.searchParams.set('state', state);
 
-    log.info('브라우저에서 Google 로그인...');
+    log.info(logT('browserGoogleLogin'));
 
     const open = (await import('open')).default;
     await open(authUrl.toString());
@@ -240,7 +414,7 @@ async function authenticateWithBrowser() {
             }
         });
 
-        server.listen(AUTH_PORT, () => log.info('인증 대기 중...'));
+        server.listen(AUTH_PORT, () => log.info(logT('authWaiting')));
         setTimeout(() => { server.close(); reject(new Error('인증 타임아웃')); }, 180000);
     });
 }
@@ -249,7 +423,7 @@ async function getAccessToken() {
     // 1. gcloud CLI 토큰 시도 (가장 권장)
     const gcloudToken = getGcloudToken();
     if (gcloudToken) {
-        log.info('gcloud CLI 토큰 사용');
+        log.info(logT('usingGcloudToken'));
         // 토큰 파일에 저장하여 동기화
         saveTokens({
             access_token: gcloudToken,
@@ -291,6 +465,661 @@ async function getAccessToken() {
     // 3. 브라우저 OAuth 인증
     tokens = await authenticateWithBrowser();
     return tokens.access_token;
+}
+
+// ============= Antigravity OAuth (이미지 생성용) =============
+
+function loadAntigravityTokens() {
+    if (fs.existsSync(ANTIGRAVITY_TOKEN_PATH)) {
+        try {
+            return JSON.parse(fs.readFileSync(ANTIGRAVITY_TOKEN_PATH, 'utf8'));
+        } catch (e) {
+            return null;
+        }
+    }
+    return null;
+}
+
+function saveAntigravityTokens(tokens) {
+    ensureConfigDir();
+    fs.writeFileSync(ANTIGRAVITY_TOKEN_PATH, JSON.stringify(tokens, null, 2));
+}
+
+async function refreshAntigravityToken(refreshToken) {
+    const response = await fetch('https://oauth2.googleapis.com/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+            client_id: ANTIGRAVITY_CLIENT_ID,
+            client_secret: ANTIGRAVITY_CLIENT_SECRET,
+            refresh_token: refreshToken,
+            grant_type: 'refresh_token'
+        })
+    });
+
+    if (!response.ok) {
+        throw new Error(`Token refresh failed: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return {
+        access_token: data.access_token,
+        refresh_token: refreshToken,
+        expiry_date: Date.now() + (data.expires_in * 1000)
+    };
+}
+
+// PKCE 생성 함수
+function generatePKCE() {
+    const verifier = require('crypto').randomBytes(32).toString('base64url');
+    const challenge = require('crypto')
+        .createHash('sha256')
+        .update(verifier)
+        .digest('base64url');
+    return { verifier, challenge };
+}
+
+async function authenticateAntigravityWithBrowser() {
+    return new Promise((resolve, reject) => {
+        const pkce = generatePKCE();
+        const state = Buffer.from(JSON.stringify({ verifier: pkce.verifier })).toString('base64url');
+
+        const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
+        authUrl.searchParams.set('client_id', ANTIGRAVITY_CLIENT_ID);
+        authUrl.searchParams.set('response_type', 'code');
+        authUrl.searchParams.set('redirect_uri', ANTIGRAVITY_REDIRECT_URI);
+        authUrl.searchParams.set('scope', ANTIGRAVITY_SCOPES.join(' '));
+        authUrl.searchParams.set('code_challenge', pkce.challenge);
+        authUrl.searchParams.set('code_challenge_method', 'S256');
+        authUrl.searchParams.set('state', state);
+        authUrl.searchParams.set('access_type', 'offline');
+        authUrl.searchParams.set('prompt', 'consent');
+
+        const server = http.createServer(async (req, res) => {
+            const reqUrl = new URL(req.url, `http://localhost:51121`);
+
+            if (reqUrl.pathname === '/oauth-callback') {
+                const code = reqUrl.searchParams.get('code');
+                const returnedState = reqUrl.searchParams.get('state');
+
+                if (!code) {
+                    res.writeHead(400, { 'Content-Type': 'text/html; charset=utf-8' });
+                    res.end('<h1>인증 실패</h1><p>코드가 없습니다.</p>');
+                    server.close();
+                    reject(new Error('No authorization code'));
+                    return;
+                }
+
+                try {
+                    const decodedState = JSON.parse(Buffer.from(returnedState, 'base64url').toString('utf8'));
+
+                    const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                        body: new URLSearchParams({
+                            client_id: ANTIGRAVITY_CLIENT_ID,
+                            client_secret: ANTIGRAVITY_CLIENT_SECRET,
+                            code: code,
+                            grant_type: 'authorization_code',
+                            redirect_uri: ANTIGRAVITY_REDIRECT_URI,
+                            code_verifier: decodedState.verifier
+                        })
+                    });
+
+                    if (!tokenResponse.ok) {
+                        throw new Error(`Token exchange failed: ${tokenResponse.status}`);
+                    }
+
+                    const tokenData = await tokenResponse.json();
+
+                    // Project ID 가져오기 (daily 엔드포인트 먼저 시도)
+                    let projectId = '';
+                    const loadEndpoints = [
+                        ANTIGRAVITY_ENDPOINTS.daily,
+                        ANTIGRAVITY_ENDPOINTS.autopush,
+                        ANTIGRAVITY_ENDPOINTS.prod
+                    ];
+
+                    for (const endpoint of loadEndpoints) {
+                        try {
+                            log.info(`  📡 loadCodeAssist: ${endpoint.includes('daily') ? 'daily' : endpoint.includes('autopush') ? 'autopush' : 'prod'}...`);
+                            const loadResponse = await fetch(`${endpoint}/v1internal:loadCodeAssist`, {
+                                method: 'POST',
+                                headers: {
+                                    'Authorization': `Bearer ${tokenData.access_token}`,
+                                    'Content-Type': 'application/json',
+                                    'User-Agent': 'antigravity/1.11.5 windows/amd64',
+                                    'X-Goog-Api-Client': 'google-cloud-sdk vscode_cloudshelleditor/0.1',
+                                    'Client-Metadata': JSON.stringify({
+                                        ideType: 'IDE_UNSPECIFIED',
+                                        platform: 'PLATFORM_UNSPECIFIED',
+                                        pluginType: 'GEMINI'
+                                    })
+                                },
+                                body: JSON.stringify({
+                                    metadata: {
+                                        ideType: 'IDE_UNSPECIFIED',
+                                        platform: 'PLATFORM_UNSPECIFIED',
+                                        pluginType: 'GEMINI'
+                                    }
+                                })
+                            });
+                            if (loadResponse.ok) {
+                                const loadData = await loadResponse.json();
+                                projectId = loadData.cloudaicompanionProject?.id || loadData.cloudaicompanionProject || '';
+                                log.info(`  ✅ Antigravity Project ID: ${projectId}`);
+                                break;
+                            } else {
+                                log.warn(`  ⚠️ loadCodeAssist failed: ${loadResponse.status}`);
+                            }
+                        } catch (e) {
+                            log.warn(`  ⚠️ loadCodeAssist error: ${e.message}`);
+                        }
+                    }
+
+                    if (!projectId) {
+                        log.warn(logT('couldNotFetchAntigravityProjectId'));
+                    }
+
+                    const tokens = {
+                        access_token: tokenData.access_token,
+                        refresh_token: tokenData.refresh_token,
+                        expiry_date: Date.now() + (tokenData.expires_in * 1000),
+                        project_id: projectId
+                    };
+
+                    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+                    res.end(`
+                        <html><body style="font-family: system-ui; text-align: center; padding: 50px;">
+                            <h1>✅ Antigravity 인증 성공!</h1>
+                            <p>이미지 생성 기능이 활성화되었습니다.</p>
+                            <p>이 창을 닫아도 됩니다.</p>
+                        </body></html>
+                    `);
+
+                    server.close();
+                    resolve(tokens);
+
+                } catch (err) {
+                    res.writeHead(500, { 'Content-Type': 'text/html; charset=utf-8' });
+                    res.end(`<h1>오류</h1><p>${err.message}</p>`);
+                    server.close();
+                    reject(err);
+                }
+            }
+        });
+
+        server.listen(51121, () => {
+            log.info(logT('antigravityOAuthServerStarted'));
+            log.info(`${logT('openUrlInBrowser')}\n${authUrl.toString()}`);
+
+            // 브라우저 자동 열기 시도 (WSL에서는 Windows 브라우저 사용)
+            let openCmd;
+            const isWSL = process.platform === 'linux' &&
+                         (fs.existsSync('/proc/version') &&
+                          fs.readFileSync('/proc/version', 'utf8').toLowerCase().includes('microsoft'));
+
+            if (process.platform === 'win32') {
+                openCmd = 'start';
+            } else if (process.platform === 'darwin') {
+                openCmd = 'open';
+            } else if (isWSL) {
+                // WSL에서는 cmd.exe를 통해 Windows 브라우저 열기
+                openCmd = 'cmd.exe /c start';
+            } else {
+                openCmd = 'xdg-open';
+            }
+
+            try {
+                execSync(`${openCmd} "${authUrl.toString()}"`, { stdio: 'ignore' });
+            } catch (e) {
+                // 브라우저 열기 실패 시 URL만 출력
+                log.info('브라우저 자동 열기 실패. 위 URL을 수동으로 열어주세요.');
+            }
+        });
+
+        // 5분 타임아웃
+        setTimeout(() => {
+            server.close();
+            reject(new Error('Authentication timeout'));
+        }, 300000);
+    });
+}
+
+// Antigravity 인증 상태 확인 (브라우저 인증 프롬프트 없음)
+function isAntigravityAuthenticated() {
+    const tokens = loadAntigravityTokens();
+    if (!tokens || !tokens.access_token) {
+        return false;
+    }
+    // 토큰 만료 확인 (refresh_token이 있으면 갱신 가능)
+    if (tokens.expiry_date && Date.now() >= tokens.expiry_date - 60000) {
+        return !!tokens.refresh_token; // refresh_token이 있으면 갱신 가능
+    }
+    return true;
+}
+
+// Antigravity 토큰 가져오기 (선택적 인증 프롬프트)
+async function getAntigravityToken(promptIfNeeded = true) {
+    let tokens = loadAntigravityTokens();
+
+    if (tokens) {
+        // 토큰 만료 확인 및 갱신
+        if (tokens.expiry_date && Date.now() >= tokens.expiry_date - 60000) {
+            if (tokens.refresh_token) {
+                try {
+                    tokens = await refreshAntigravityToken(tokens.refresh_token);
+                    saveAntigravityTokens(tokens);
+                } catch (e) {
+                    log.warn(logT('antigravityTokenRefreshFailed'));
+                    if (promptIfNeeded) {
+                        tokens = await authenticateAntigravityWithBrowser();
+                        saveAntigravityTokens(tokens);
+                    } else {
+                        return null;
+                    }
+                }
+            } else {
+                if (promptIfNeeded) {
+                    tokens = await authenticateAntigravityWithBrowser();
+                    saveAntigravityTokens(tokens);
+                } else {
+                    return null;
+                }
+            }
+        }
+        return tokens.access_token;
+    }
+
+    // 새로운 인증 (promptIfNeeded가 false면 null 반환)
+    if (promptIfNeeded) {
+        tokens = await authenticateAntigravityWithBrowser();
+        saveAntigravityTokens(tokens);
+        return tokens.access_token;
+    }
+    return null;
+}
+
+// ============= 이미지 후처리 (배경 제거) =============
+
+/**
+ * 흰색 배경을 투명하게 변환하는 함수
+ * @param {Buffer} imageBuffer - 원본 이미지 버퍼
+ * @param {Object} options - 옵션
+ * @param {number} options.threshold - 흰색 판단 임계값 (기본: 240)
+ * @param {boolean} options.smoothEdges - 가장자리 스무딩 (기본: true)
+ * @returns {Promise<Buffer>} - 투명 배경 이미지 버퍼
+ */
+async function removeWhiteBackground(imageBuffer, options = {}) {
+    const { threshold = 240, smoothEdges = true } = options;
+
+    try {
+        // 이미지 메타데이터 확인
+        const metadata = await sharp(imageBuffer).metadata();
+        const { width, height } = metadata;
+
+        // raw 픽셀 데이터 추출 (RGBA)
+        const { data, info } = await sharp(imageBuffer)
+            .ensureAlpha()
+            .raw()
+            .toBuffer({ resolveWithObject: true });
+
+        const pixelArray = new Uint8Array(data);
+
+        // 흰색 픽셀을 투명으로 변환
+        for (let i = 0; i < pixelArray.length; i += 4) {
+            const r = pixelArray[i];
+            const g = pixelArray[i + 1];
+            const b = pixelArray[i + 2];
+
+            // 흰색 또는 거의 흰색인 픽셀 검사
+            if (r > threshold && g > threshold && b > threshold) {
+                pixelArray[i + 3] = 0; // 알파 채널을 0으로 (투명)
+            }
+        }
+
+        // 수정된 픽셀 데이터로 새 이미지 생성
+        let outputImage = sharp(Buffer.from(pixelArray), {
+            raw: {
+                width: info.width,
+                height: info.height,
+                channels: 4
+            }
+        });
+
+        // 가장자리 스무딩 적용 (선택적)
+        if (smoothEdges) {
+            outputImage = outputImage.median(1); // 미디안 필터로 가장자리 정리
+        }
+
+        // PNG로 출력 (투명도 지원)
+        const outputBuffer = await outputImage.png().toBuffer();
+
+        log.success(logT('backgroundRemovalComplete', (imageBuffer.length / 1024).toFixed(1), (outputBuffer.length / 1024).toFixed(1)));
+        return outputBuffer;
+
+    } catch (err) {
+        log.error(logT('backgroundRemovalFailed', err.message));
+        // 실패 시 원본 이미지 반환
+        return imageBuffer;
+    }
+}
+
+/**
+ * 배경색 자동 감지 후 제거 (흰색이 아닌 단색 배경도 처리)
+ * @param {Buffer} imageBuffer - 원본 이미지 버퍼
+ * @param {Object} options - 옵션
+ * @param {number} options.tolerance - 색상 허용 오차 (기본: 30)
+ * @param {number} options.edgeSampleSize - 가장자리 샘플링 크기 (기본: 10)
+ * @returns {Promise<Buffer>} - 투명 배경 이미지 버퍼
+ */
+async function removeBackgroundAuto(imageBuffer, options = {}) {
+    const { tolerance = 30, edgeSampleSize = 10 } = options;
+
+    try {
+        const metadata = await sharp(imageBuffer).metadata();
+        const { width, height } = metadata;
+
+        const { data, info } = await sharp(imageBuffer)
+            .ensureAlpha()
+            .raw()
+            .toBuffer({ resolveWithObject: true });
+
+        const pixelArray = new Uint8Array(data);
+
+        // 가장자리에서 배경색 추출 (네 모서리 평균)
+        const corners = [
+            0, // 좌상단
+            (width - 1) * 4, // 우상단
+            (height - 1) * width * 4, // 좌하단
+            ((height - 1) * width + (width - 1)) * 4 // 우하단
+        ];
+
+        let bgR = 0, bgG = 0, bgB = 0;
+        for (const idx of corners) {
+            bgR += pixelArray[idx];
+            bgG += pixelArray[idx + 1];
+            bgB += pixelArray[idx + 2];
+        }
+        bgR = Math.round(bgR / 4);
+        bgG = Math.round(bgG / 4);
+        bgB = Math.round(bgB / 4);
+
+        log.info(logT('detectedBackgroundColor', bgR, bgG, bgB));
+
+        // 배경색과 유사한 픽셀을 투명으로 변환
+        for (let i = 0; i < pixelArray.length; i += 4) {
+            const r = pixelArray[i];
+            const g = pixelArray[i + 1];
+            const b = pixelArray[i + 2];
+
+            // 배경색과의 거리 계산
+            const distance = Math.sqrt(
+                Math.pow(r - bgR, 2) +
+                Math.pow(g - bgG, 2) +
+                Math.pow(b - bgB, 2)
+            );
+
+            if (distance < tolerance) {
+                pixelArray[i + 3] = 0;
+            }
+        }
+
+        const outputBuffer = await sharp(Buffer.from(pixelArray), {
+            raw: {
+                width: info.width,
+                height: info.height,
+                channels: 4
+            }
+        }).png().toBuffer();
+
+        log.success(logT('autoBackgroundRemovalComplete'));
+        return outputBuffer;
+
+    } catch (err) {
+        log.error(logT('autoBackgroundRemovalFailed', err.message));
+        return imageBuffer;
+    }
+}
+
+// ============= Gemini 3 Pro 이미지 생성 =============
+
+// Stitch API를 사용한 이미지 생성 폴백
+async function generateImageWithStitch(prompt, options = {}, accessToken) {
+    try {
+        const { assetType = 'illustration', style = 'modern' } = options;
+
+        // Stitch API로 에셋 스타일의 디자인 화면 생성
+        let designPrompt = `Create a ${style} style design featuring: ${prompt}. `;
+
+        switch (assetType) {
+            case 'logo':
+                designPrompt += 'Focus on the logo design, centered, with clean background. Show only the logo prominently.';
+                break;
+            case 'icon':
+                designPrompt += 'Display a clean, simple icon in the center with minimal background.';
+                break;
+            case 'hero':
+                designPrompt += 'Create a wide hero banner image suitable for website header.';
+                break;
+            case 'wireframe':
+                designPrompt += 'Create a low-fidelity wireframe sketch with boxes and placeholder elements.';
+                break;
+            default:
+                designPrompt += 'Create an artistic illustration or design element.';
+        }
+
+        const stitchProjectId = process.env.GOOGLE_CLOUD_PROJECT || 'stitch-mcp-auto';
+
+        // Stitch API 호출
+        const response = await fetch(`https://stitch.googleapis.com/v1/projects/${stitchProjectId}/screens:generateFromText`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                prompt: designPrompt,
+                deviceType: 'MOBILE'
+            })
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Stitch API error: ${response.status} - ${errorText}`);
+        }
+
+        const data = await response.json();
+
+        // 화면 이미지 가져오기
+        if (data.screen && data.screen.name) {
+            const screenName = data.screen.name;
+            const imageUrl = `https://stitch.googleapis.com/v1/${screenName}:fetchImage?imageType=PREVIEW`;
+
+            const imageResponse = await fetch(imageUrl, {
+                headers: {
+                    'Authorization': `Bearer ${accessToken}`
+                }
+            });
+
+            if (imageResponse.ok) {
+                const imageBuffer = await imageResponse.buffer();
+                return {
+                    success: true,
+                    imageData: imageBuffer.toString('base64'),
+                    mimeType: 'image/png',
+                    prompt: prompt,
+                    source: 'stitch'
+                };
+            }
+        }
+
+        return {
+            success: false,
+            error: 'Stitch API 폴백 생성 실패',
+            source: 'stitch'
+        };
+
+    } catch (err) {
+        return {
+            success: false,
+            error: `Stitch 폴백 오류: ${err.message}`,
+            source: 'stitch'
+        };
+    }
+}
+
+async function generateImageWithGemini(prompt, options = {}, forceAuth = true) {
+    const token = await getAntigravityToken(forceAuth);
+
+    // 디버그: 어떤 토큰을 사용하는지 확인
+    log.info(`  🔑 Using Antigravity token: ${token ? token.substring(0, 20) + '...' : 'null'}`);
+
+    // 토큰이 없으면 Antigravity 인증이 필요함을 알림
+    if (!token) {
+        return {
+            success: false,
+            error: 'Antigravity 인증이 필요합니다. check_antigravity_auth 도구로 인증 상태를 확인하세요.',
+            needsAuth: true,
+            source: 'antigravity'
+        };
+    }
+
+    const {
+        model = 'gemini-3-pro',  // Antigravity OAuth를 통한 gemini-3-pro 모델 (이미지 생성 지원)
+        style = 'auto'
+    } = options;
+
+    // Antigravity 토큰에서 project ID 가져오기
+    const tokens = loadAntigravityTokens();
+    const projectId = tokens?.project_id;
+
+    if (!projectId) {
+        log.warn('  ⚠️ No Antigravity project ID. Re-authentication required.');
+        return {
+            success: false,
+            error: 'Antigravity project ID not found. Please re-authenticate with Antigravity.',
+            needsAuth: true,
+            source: 'antigravity'
+        };
+    }
+
+    log.info(`  🔑 Using Antigravity project: ${projectId}`);
+
+    // Antigravity 엔드포인트 Fallback 순서 (daily 먼저!)
+    const endpointFallbacks = [
+        ANTIGRAVITY_ENDPOINTS.daily,
+        ANTIGRAVITY_ENDPOINTS.autopush,
+        ANTIGRAVITY_ENDPOINTS.prod
+    ];
+
+    // Antigravity 헤더 (Client-Metadata 포함)
+    const antigravityHeaders = {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        'User-Agent': 'antigravity/1.11.5 windows/amd64',
+        'X-Goog-Api-Client': 'google-cloud-sdk vscode_cloudshelleditor/0.1',
+        'Client-Metadata': JSON.stringify({
+            ideType: 'IDE_UNSPECIFIED',
+            platform: 'PLATFORM_UNSPECIFIED',
+            pluginType: 'GEMINI'
+        })
+    };
+
+    const requestBody = {
+        project: projectId,
+        model: model,
+        request: {
+            contents: [{
+                role: 'user',
+                parts: [{
+                    text: `Generate an image: ${prompt}${style !== 'auto' ? `. Style: ${style}` : ''}`
+                }]
+            }],
+            generationConfig: {
+                responseModalities: ['TEXT', 'IMAGE']
+            }
+        },
+        requestType: 'agent',
+        userAgent: 'antigravity',
+        requestId: `agent-${require('crypto').randomUUID()}`
+    };
+
+    let lastError = null;
+
+    for (const endpoint of endpointFallbacks) {
+        try {
+            const apiUrl = `${endpoint}/v1internal:generateContent`;
+            const endpointName = endpoint.includes('daily') ? 'daily' : endpoint.includes('autopush') ? 'autopush' : 'prod';
+            log.info(`  📡 Trying ${endpointName}: ${model}...`);
+
+            const response = await fetch(apiUrl, {
+                method: 'POST',
+                headers: antigravityHeaders,
+                body: JSON.stringify(requestBody)
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                lastError = `API error ${response.status}: ${errorText}`;
+                log.warn(`  ⚠️ ${endpointName} failed: ${response.status}`);
+                continue; // 다음 엔드포인트 시도
+            }
+
+            const data = await response.json();
+
+            // Antigravity API는 response 객체 안에 결과를 래핑함
+            const responseData = data.response || data;
+            const candidates = responseData.candidates || [];
+
+            // 이미지 데이터 추출
+            for (const candidate of candidates) {
+                const parts = candidate.content?.parts || [];
+                for (const part of parts) {
+                    if (part.inlineData) {
+                        log.info(`  ✅ Image generated via ${endpointName}`);
+                        return {
+                            success: true,
+                            imageData: part.inlineData.data,
+                            mimeType: part.inlineData.mimeType || 'image/png',
+                            prompt: prompt,
+                            source: 'antigravity',
+                            model: model
+                        };
+                    }
+                }
+            }
+
+            // 응답은 있지만 이미지가 없음 - 텍스트 응답일 수 있음
+            const textContent = candidates[0]?.content?.parts?.[0]?.text;
+            if (textContent) {
+                log.info(`  ✅ Text response received via ${endpointName}`);
+                return {
+                    success: true,
+                    text: textContent,
+                    prompt: prompt,
+                    source: 'antigravity',
+                    model: model
+                };
+            }
+
+            lastError = 'No image or text data in response';
+            log.warn(`  ⚠️ ${endpointName}: No content in response`);
+            continue; // 다음 엔드포인트 시도
+
+        } catch (err) {
+            lastError = err.message;
+            log.warn(`  ⚠️ Endpoint error: ${err.message}`);
+            continue; // 다음 엔드포인트 시도
+        }
+    }
+
+    // 모든 엔드포인트 실패
+    return {
+        success: false,
+        error: `All endpoints failed. Last error: ${lastError}`,
+        source: 'antigravity'
+    };
 }
 
 // ============= 다국어 지원 =============
@@ -617,7 +1446,7 @@ async function verifyProject(accessToken, projectId) {
 // ============= 브라우저 기반 설정 마법사 =============
 
 async function runSetupWizard(accessToken) {
-    log.step('설정 마법사 시작...');
+    log.step(logT('setupWizardStarting'));
 
     const config = loadConfig();
 
@@ -625,7 +1454,7 @@ async function runSetupWizard(accessToken) {
     if (config.projectId && config.setupComplete) {
         const isStitchEnabled = await checkApiEnabled(accessToken, config.projectId, 'stitch.googleapis.com');
         if (isStitchEnabled) {
-            log.success(`기존 설정 사용: ${config.projectId}`);
+            log.success(logT('usingExistingConfig', config.projectId));
             return config.projectId;
         }
     }
@@ -644,7 +1473,7 @@ async function runSetupWizard(accessToken) {
             const projects = await listUserProjects(accessToken);
             if (projects.length > 0) {
                 currentProjectId = projects[0].projectId;
-                log.info(`기존 프로젝트 발견: ${currentProjectId}`);
+                log.info(logT('existingProjectFound', currentProjectId));
                 saveConfig({ projectId: currentProjectId, setupComplete: false });
             }
         }
@@ -672,7 +1501,7 @@ async function runSetupWizard(accessToken) {
                     if (isValid) {
                         currentProjectId = inputProjectId;
                         saveConfig({ projectId: currentProjectId, setupComplete: false });
-                        log.success(`프로젝트 확인됨: ${currentProjectId}`);
+                        log.success(logT('projectVerified', currentProjectId));
                         res.writeHead(302, { Location: `/setup/check?lang=${lang}` });
                         res.end();
                         return;
@@ -729,7 +1558,7 @@ async function runSetupWizard(accessToken) {
         });
 
         server.listen(SETUP_PORT, async () => {
-            log.info(`설정 마법사: http://localhost:${SETUP_PORT}`);
+            log.info(logT('setupWizardUrl', SETUP_PORT));
             const open = (await import('open')).default;
             await open(`http://localhost:${SETUP_PORT}`);
         });
@@ -742,6 +1571,120 @@ async function runSetupWizard(accessToken) {
             }
         }, 600000);
     });
+}
+
+// ============= 로컬 워크스페이스 프로젝트 관리 =============
+
+const LOCAL_PROJECT_FILE = '.stitch-project.json';
+
+// 현재 세션의 활성 프로젝트 (메모리)
+let activeProject = null;
+
+function getLocalProjectPath() {
+    return path.join(process.cwd(), LOCAL_PROJECT_FILE);
+}
+
+function loadLocalProject() {
+    const projectPath = getLocalProjectPath();
+    if (fs.existsSync(projectPath)) {
+        try {
+            const data = JSON.parse(fs.readFileSync(projectPath, 'utf8'));
+            return data;
+        } catch (e) {
+            return null;
+        }
+    }
+    return null;
+}
+
+function saveLocalProject(projectData) {
+    const projectPath = getLocalProjectPath();
+    fs.writeFileSync(projectPath, JSON.stringify(projectData, null, 2));
+    // 활성 프로젝트도 업데이트
+    activeProject = projectData;
+}
+
+function clearLocalProject() {
+    const projectPath = getLocalProjectPath();
+    if (fs.existsSync(projectPath)) {
+        fs.unlinkSync(projectPath);
+        activeProject = null;
+        return true;
+    }
+    return false;
+}
+
+// 프로젝트 ID 자동 해결: args.projectId > activeProject > localProject
+function resolveProjectId(argsProjectId) {
+    // 1. 명시적으로 전달된 projectId 사용
+    if (argsProjectId) {
+        return { projectId: argsProjectId, source: 'argument' };
+    }
+
+    // 2. 현재 세션의 활성 프로젝트 사용
+    if (activeProject && activeProject.projectId) {
+        return { projectId: activeProject.projectId, source: 'session', projectName: activeProject.projectName };
+    }
+
+    // 3. 로컬 워크스페이스에서 불러오기
+    const localProject = loadLocalProject();
+    if (localProject && localProject.projectId) {
+        // 로컬에서 불러온 프로젝트를 활성 프로젝트로 설정
+        activeProject = localProject;
+        log.info(logT('workspaceProjectFound', localProject.projectName || localProject.projectId));
+        return { projectId: localProject.projectId, source: 'workspace', projectName: localProject.projectName };
+    }
+
+    // 4. 프로젝트 없음
+    return { projectId: null, source: 'none' };
+}
+
+// 프로젝트가 필요할 때 반환할 에러 응답 생성
+function createProjectRequiredResponse() {
+    const message = systemLocale === 'ko'
+        ? `⚠️ 프로젝트가 설정되지 않았습니다.
+
+다음 중 하나를 선택해주세요:
+1. **기존 프로젝트 사용**: list_projects로 프로젝트 목록을 확인하고 projectId를 전달
+2. **새 프로젝트 생성**: create_project로 새 프로젝트 생성
+
+프로젝트가 설정되면 자동으로 현재 워크스페이스에 저장되어 다음 세션에서도 사용됩니다.`
+        : `⚠️ No project is set.
+
+Please choose one of the following:
+1. **Use existing project**: Check project list with list_projects and pass projectId
+2. **Create new project**: Create a new project with create_project
+
+Once a project is set, it will be automatically saved to the current workspace for future sessions.`;
+
+    return {
+        content: [{
+            type: "text",
+            text: JSON.stringify({
+                error: "PROJECT_REQUIRED",
+                message: message,
+                suggestions: [
+                    { action: "list_projects", description: systemLocale === 'ko' ? "프로젝트 목록 확인" : "List available projects" },
+                    { action: "create_project", description: systemLocale === 'ko' ? "새 프로젝트 생성" : "Create new project" }
+                ],
+                workspacePath: process.cwd()
+            }, null, 2)
+        }],
+        isError: true
+    };
+}
+
+// 프로젝트 설정 및 저장
+function setActiveProject(projectId, projectName = null) {
+    const projectData = {
+        projectId: projectId,
+        projectName: projectName,
+        lastUsed: new Date().toISOString(),
+        workspacePath: process.cwd()
+    };
+    saveLocalProject(projectData);
+    log.success(logT('workspaceProjectSaved', projectName || projectId));
+    return projectData;
 }
 
 // ============= Stitch API 호출 =============
@@ -790,20 +1733,20 @@ async function callStitchAPI(method, params, projectId, accessToken) {
 
 async function main() {
     try {
-        log.info(`Stitch MCP Server v2.2.0 - ${os.platform()}`);
+        log.info(logT('serverVersion', os.platform()));
 
         // 1. OAuth 인증
-        log.step('OAuth 인증...');
+        log.step(logT('oauthAuthenticating'));
         const accessToken = await getAccessToken();
-        log.success('OAuth 인증 완료');
+        log.success(logT('oauthComplete'));
 
         // 2. 설정 마법사
-        log.step('프로젝트 설정...');
+        log.step(logT('projectConfiguring'));
         const projectId = await runSetupWizard(accessToken);
-        log.success(`프로젝트: ${projectId}`);
+        log.success(logT('projectSet', projectId));
 
         // 3. MCP 서버 시작
-        log.step('MCP 서버 시작...');
+        log.step(logT('mcpServerStarting'));
 
         const server = new Server(
             { name: "stitch", version: "2.2.0" },
@@ -864,6 +1807,38 @@ async function main() {
 
         // ========== 커스텀 도구 정의 ==========
         const CUSTOM_TOOLS = [
+            // ========== 워크스페이스 프로젝트 관리 도구 ==========
+            {
+                name: "get_workspace_project",
+                description: "🔍 Checks if there is an existing Stitch project associated with the current workspace/folder. Returns project info if found, or null if no project is set. Use this at the start of a session to check for existing projects and ask the user if they want to continue with it.",
+                inputSchema: {
+                    type: "object",
+                    properties: {},
+                    required: []
+                }
+            },
+            {
+                name: "set_workspace_project",
+                description: "💾 Associates a Stitch project with the current workspace/folder. This allows continuing work on the same project in future sessions. The project info is stored in .stitch-project.json in the current directory.",
+                inputSchema: {
+                    type: "object",
+                    properties: {
+                        projectId: { type: "string", description: "The Stitch project ID (e.g., 'projects/1234567890')" },
+                        projectName: { type: "string", description: "Human-readable project name for display" }
+                    },
+                    required: ["projectId"]
+                }
+            },
+            {
+                name: "clear_workspace_project",
+                description: "🗑️ Removes the Stitch project association from the current workspace/folder. Use this when the user wants to start fresh or switch to a different project.",
+                inputSchema: {
+                    type: "object",
+                    properties: {},
+                    required: []
+                }
+            },
+
             // 기존 도구
             {
                 name: "fetch_screen_code",
@@ -1107,6 +2082,106 @@ async function main() {
                     },
                     required: ["projectId"]
                 }
+            },
+
+            // ========== 이미지 생성 도구 (Antigravity/Gemini 전용) ==========
+            {
+                name: "generate_design_asset",
+                description: "🎨 Generates design assets (logo, icon, illustration, hero image, wireframe) using Gemini via Antigravity OAuth. Supports gemini-3-pro (default), gemini-2.5-pro. Use check_antigravity_auth to verify auth status first.",
+                inputSchema: {
+                    type: "object",
+                    properties: {
+                        assetType: {
+                            type: "string",
+                            enum: ["logo", "icon", "illustration", "hero", "wireframe", "background", "pattern"],
+                            description: "Type of asset to generate"
+                        },
+                        prompt: { type: "string", description: "Detailed description of the asset to generate" },
+                        model: {
+                            type: "string",
+                            enum: ["gemini-3-pro", "gemini-2.5-pro"],
+                            description: "Gemini model to use for image generation. gemini-3-pro is recommended for best quality.",
+                            default: "gemini-3-pro"
+                        },
+                        style: {
+                            type: "string",
+                            enum: ["minimal", "modern", "playful", "corporate", "organic", "flat", "3d", "gradient", "auto"],
+                            description: "Visual style for the asset",
+                            default: "auto"
+                        },
+                        colorScheme: { type: "string", description: "Color scheme hint (e.g., 'blue gradient', 'earth tones', '#4CAF50')" },
+                        aspectRatio: {
+                            type: "string",
+                            enum: ["1:1", "16:9", "9:16", "4:3", "3:4"],
+                            description: "Aspect ratio of the generated image",
+                            default: "1:1"
+                        },
+                        saveToFile: { type: "boolean", description: "Save generated image to file", default: true },
+                        forceAntigravityAuth: { type: "boolean", description: "Force Antigravity browser authentication for better image quality (optional)", default: false },
+                        removeBackground: {
+                            type: "boolean",
+                            description: "Automatically remove white/solid background and make transparent (recommended for logos, icons)",
+                            default: false
+                        },
+                        backgroundRemovalMode: {
+                            type: "string",
+                            enum: ["white", "auto"],
+                            description: "Background removal mode: 'white' for white backgrounds, 'auto' for auto-detecting solid colors",
+                            default: "white"
+                        },
+                        backgroundThreshold: {
+                            type: "number",
+                            description: "Threshold for background detection (0-255, higher = more aggressive). Default: 240 for white mode, 30 tolerance for auto mode",
+                            default: 240
+                        }
+                    },
+                    required: ["assetType", "prompt"]
+                }
+            },
+            {
+                name: "orchestrate_design",
+                description: "🎭 Full design orchestration: Generates assets (logo, icons, hero) via Antigravity/Gemini 3 Pro with auto background removal, then creates complete UI with Stitch API. Requires both Stitch (gcloud) and Antigravity auth for full functionality. One prompt to complete design!",
+                inputSchema: {
+                    type: "object",
+                    properties: {
+                        description: { type: "string", description: "Full description of the screen/page to create (e.g., '친환경 쇼핑몰 메인 페이지, 녹색 테마')" },
+                        projectId: { type: "string", description: "Stitch project ID to create the screen in" },
+                        autoGenerateAssets: { type: "boolean", description: "Automatically generate required assets before UI creation", default: true },
+                        assetHints: {
+                            type: "object",
+                            properties: {
+                                needsLogo: { type: "boolean", description: "Generate a logo", default: true },
+                                needsHeroImage: { type: "boolean", description: "Generate a hero/banner image", default: true },
+                                needsIcons: { type: "boolean", description: "Generate icon set", default: false },
+                                customAssets: {
+                                    type: "array",
+                                    items: { type: "string" },
+                                    description: "Additional custom assets to generate"
+                                }
+                            }
+                        },
+                        designPreferences: {
+                            type: "object",
+                            properties: {
+                                style: { type: "string", description: "Overall design style (modern, minimal, playful, etc.)" },
+                                colorScheme: { type: "string", description: "Primary color scheme" },
+                                mood: { type: "string", description: "Design mood (professional, friendly, luxurious, etc.)" }
+                            }
+                        },
+                        deviceType: { type: "string", enum: ["MOBILE", "DESKTOP", "TABLET"], description: "Target device", default: "MOBILE" },
+                        forceAntigravityAuth: { type: "boolean", description: "Force Antigravity browser authentication for better image quality (optional)", default: false }
+                    },
+                    required: ["description", "projectId"]
+                }
+            },
+            {
+                name: "check_antigravity_auth",
+                description: "Checks Antigravity (Gemini 3 Pro) auth status. Required for image asset generation (logo, icon, illustration). Stitch auth (gcloud) is separate and used for UI page generation.",
+                inputSchema: {
+                    type: "object",
+                    properties: {},
+                    required: []
+                }
             }
         ];
 
@@ -1126,6 +2201,144 @@ async function main() {
         server.setRequestHandler(CallToolRequestSchema, async (request) => {
             const { name, arguments: args } = request.params;
             const token = await getAccessToken();
+
+            // ========== 프로젝트가 필요한 도구 목록 ==========
+            const TOOLS_REQUIRING_PROJECT = [
+                'get_screen', 'list_screens', 'generate_screen_from_text', 'fetch_screen_code', 'fetch_screen_image',
+                'extract_design_context', 'apply_design_context', 'compare_designs',
+                'generate_design_tokens', 'generate_responsive_variant', 'batch_generate_screens',
+                'analyze_accessibility', 'extract_components', 'suggest_trending_design',
+                'generate_style_guide', 'export_design_system', 'orchestrate_design'
+            ];
+
+            // ========== 프로젝트 자동 해결 ==========
+            // projectId가 필요한 도구에서 자동으로 프로젝트를 해결
+            if (TOOLS_REQUIRING_PROJECT.includes(name)) {
+                const resolved = resolveProjectId(args?.projectId);
+
+                if (!resolved.projectId) {
+                    // 프로젝트가 없으면 에러 반환
+                    return createProjectRequiredResponse();
+                }
+
+                // args에 해결된 projectId 설정
+                if (!args) {
+                    args = {};
+                }
+                if (!args.projectId) {
+                    args.projectId = resolved.projectId;
+                    if (resolved.source !== 'argument') {
+                        log.info(systemLocale === 'ko'
+                            ? `📂 프로젝트 자동 사용: ${resolved.projectName || resolved.projectId} (${resolved.source})`
+                            : `📂 Auto-using project: ${resolved.projectName || resolved.projectId} (${resolved.source})`);
+                    }
+                }
+            }
+
+            // ========== 워크스페이스 프로젝트 관리 도구 ==========
+
+            // get_workspace_project - 현재 워크스페이스의 프로젝트 확인
+            if (name === "get_workspace_project") {
+                try {
+                    const localProject = loadLocalProject();
+
+                    if (localProject && localProject.projectId) {
+                        log.info(logT('workspaceProjectFound', localProject.projectName || localProject.projectId));
+
+                        return {
+                            content: [{
+                                type: "text",
+                                text: JSON.stringify({
+                                    found: true,
+                                    projectId: localProject.projectId,
+                                    projectName: localProject.projectName || null,
+                                    lastUsed: localProject.lastUsed || null,
+                                    workspacePath: process.cwd(),
+                                    message: systemLocale === 'ko'
+                                        ? `기존 프로젝트를 발견했습니다: ${localProject.projectName || localProject.projectId}. 이어서 진행하시겠습니까?`
+                                        : `Found existing project: ${localProject.projectName || localProject.projectId}. Would you like to continue with this project?`,
+                                    options: systemLocale === 'ko'
+                                        ? { continue: "예, 이어서 진행", newProject: "아니오, 새 프로젝트 생성" }
+                                        : { continue: "Yes, continue", newProject: "No, create new project" }
+                                }, null, 2)
+                            }]
+                        };
+                    } else {
+                        log.info(logT('noWorkspaceProject'));
+
+                        return {
+                            content: [{
+                                type: "text",
+                                text: JSON.stringify({
+                                    found: false,
+                                    workspacePath: process.cwd(),
+                                    message: systemLocale === 'ko'
+                                        ? "현재 워크스페이스에 연결된 프로젝트가 없습니다. 새 프로젝트를 생성하거나 기존 프로젝트를 선택해주세요."
+                                        : "No project associated with current workspace. Please create a new project or select an existing one."
+                                }, null, 2)
+                            }]
+                        };
+                    }
+                } catch (err) {
+                    return { content: [{ type: "text", text: `Error: ${err.message}` }], isError: true };
+                }
+            }
+
+            // set_workspace_project - 워크스페이스에 프로젝트 연결
+            if (name === "set_workspace_project") {
+                try {
+                    const projectData = {
+                        projectId: args.projectId,
+                        projectName: args.projectName || null,
+                        lastUsed: new Date().toISOString(),
+                        workspacePath: process.cwd()
+                    };
+
+                    saveLocalProject(projectData);
+                    log.success(logT('workspaceProjectSaved', args.projectName || args.projectId));
+
+                    return {
+                        content: [{
+                            type: "text",
+                            text: JSON.stringify({
+                                success: true,
+                                projectId: args.projectId,
+                                projectName: args.projectName || null,
+                                savedTo: path.join(process.cwd(), LOCAL_PROJECT_FILE),
+                                message: systemLocale === 'ko'
+                                    ? `프로젝트가 워크스페이스에 저장되었습니다. 다음 세션에서 자동으로 이 프로젝트를 불러옵니다.`
+                                    : `Project saved to workspace. This project will be automatically loaded in future sessions.`
+                            }, null, 2)
+                        }]
+                    };
+                } catch (err) {
+                    return { content: [{ type: "text", text: `Error: ${err.message}` }], isError: true };
+                }
+            }
+
+            // clear_workspace_project - 워크스페이스 프로젝트 초기화
+            if (name === "clear_workspace_project") {
+                try {
+                    const cleared = clearLocalProject();
+                    log.info(logT('workspaceProjectCleared'));
+
+                    return {
+                        content: [{
+                            type: "text",
+                            text: JSON.stringify({
+                                success: true,
+                                cleared: cleared,
+                                workspacePath: process.cwd(),
+                                message: systemLocale === 'ko'
+                                    ? "워크스페이스 프로젝트 연결이 해제되었습니다."
+                                    : "Workspace project association has been cleared."
+                            }, null, 2)
+                        }]
+                    };
+                } catch (err) {
+                    return { content: [{ type: "text", text: `Error: ${err.message}` }], isError: true };
+                }
+            }
 
             // fetch_screen_code
             if (name === "fetch_screen_code") {
@@ -2338,9 +3551,533 @@ ${exportPackage.components.length} components extracted.
                 }
             }
 
+            // ========== 이미지 생성 도구 핸들러 (Antigravity/Gemini 3 Pro + Stitch 폴백) ==========
+
+            // check_antigravity_auth - Antigravity 인증 상태 확인
+            if (name === "check_antigravity_auth") {
+                try {
+                    const antigravityTokens = loadAntigravityTokens();
+
+                    if (antigravityTokens && antigravityTokens.access_token) {
+                        const isExpired = antigravityTokens.expiry_date && Date.now() >= antigravityTokens.expiry_date;
+
+                        return {
+                            content: [{
+                                type: "text",
+                                text: JSON.stringify({
+                                    authenticated: true,
+                                    status: isExpired ? "expired" : "valid",
+                                    projectId: antigravityTokens.project_id || "unknown",
+                                    imageGenerationMethod: "Gemini 3 Pro (Antigravity)",
+                                    message: isExpired
+                                        ? "토큰이 만료되었습니다. 이미지 생성 시 자동으로 갱신됩니다."
+                                        : "✅ Antigravity 인증 완료. Gemini 3 Pro로 고품질 이미지 생성이 가능합니다.",
+                                    capabilities: ["generate_design_asset", "orchestrate_design"]
+                                }, null, 2)
+                            }]
+                        };
+                    }
+
+                    return {
+                        content: [{
+                            type: "text",
+                            text: JSON.stringify({
+                                authenticated: false,
+                                status: "not_authenticated",
+                                message: "⚠️ Antigravity 미인증 상태입니다.",
+                                availableFeatures: {
+                                    withoutAuth: [
+                                        "Stitch API - UI 화면/페이지 생성 (generate_screen_from_text)",
+                                        "Stitch API - 프로젝트 관리, 디자인 시스템 등"
+                                    ],
+                                    requiresAuth: [
+                                        "이미지 에셋 생성 (generate_design_asset) - 로고, 아이콘, 일러스트",
+                                        "배경 제거 기능",
+                                        "오케스트레이션 (orchestrate_design) - 에셋 자동 생성 + UI 배치"
+                                    ]
+                                },
+                                instructions: [
+                                    "📌 Antigravity 인증 방법:",
+                                    "1. generate_design_asset 호출 시 forceAntigravityAuth: true 옵션 사용",
+                                    "2. 브라우저에서 Google 계정으로 로그인",
+                                    "3. 인증 완료 후 Gemini 3 Pro로 이미지 생성 가능"
+                                ],
+                                note: "UI 화면 생성은 인증 없이도 Stitch API로 가능합니다."
+                            }, null, 2)
+                        }]
+                    };
+
+                } catch (err) {
+                    return { content: [{ type: "text", text: `Error checking auth: ${err.message}` }], isError: true };
+                }
+            }
+
+            // generate_design_asset - 이미지 에셋 생성
+            if (name === "generate_design_asset") {
+                try {
+                    const {
+                        assetType,
+                        prompt,
+                        model = "gemini-3-pro",  // 사용자 선택 모델 (gemini-3-pro 또는 gemini-2.5-pro)
+                        style = "auto",
+                        colorScheme,
+                        aspectRatio = "1:1",
+                        saveToFile = true,
+                        forceAntigravityAuth = false,
+                        removeBackground = false,
+                        backgroundRemovalMode = "white",
+                        backgroundThreshold = 240
+                    } = args;
+
+                    log.info(logT('imageGenStarting', assetType, removeBackground ? logT('withBackgroundRemoval') : ''));
+
+                    // 프롬프트 구성
+                    let enhancedPrompt = `Create a ${assetType}`;
+
+                    switch (assetType) {
+                        case "logo":
+                            enhancedPrompt = `Design a professional logo: ${prompt}. Make it clean, scalable, and memorable.`;
+                            break;
+                        case "icon":
+                            enhancedPrompt = `Create a simple, clear icon: ${prompt}. Suitable for UI, flat style, high contrast.`;
+                            break;
+                        case "illustration":
+                            enhancedPrompt = `Create an illustration: ${prompt}. Artistic and visually appealing.`;
+                            break;
+                        case "hero":
+                            enhancedPrompt = `Create a hero/banner image: ${prompt}. Wide format, impactful, suitable for website header.`;
+                            break;
+                        case "wireframe":
+                            enhancedPrompt = `Create a low-fidelity wireframe sketch: ${prompt}. Simple boxes, lines, placeholder text style.`;
+                            break;
+                        case "background":
+                            enhancedPrompt = `Create a background pattern/texture: ${prompt}. Seamless, subtle, suitable for UI background.`;
+                            break;
+                        case "pattern":
+                            enhancedPrompt = `Create a seamless pattern: ${prompt}. Tileable, decorative.`;
+                            break;
+                        default:
+                            enhancedPrompt = `Create a ${assetType}: ${prompt}`;
+                    }
+
+                    if (colorScheme) {
+                        enhancedPrompt += ` Use color scheme: ${colorScheme}.`;
+                    }
+
+                    // Antigravity 인증 확인 후 Gemini 3 Pro로 이미지 생성
+                    let result = null;
+
+                    // 인증 상태 확인
+                    if (!isAntigravityAuthenticated() && !forceAntigravityAuth) {
+                        // 미인증 상태이고 인증 강제도 아닌 경우
+                        return {
+                            content: [{
+                                type: "text",
+                                text: JSON.stringify({
+                                    success: false,
+                                    error: "Antigravity 인증이 필요합니다.",
+                                    message: "이미지 에셋 생성은 Antigravity/Gemini 3 Pro 인증이 필요합니다.",
+                                    hint: "forceAntigravityAuth: true 옵션으로 브라우저 인증을 시작하거나, check_antigravity_auth 도구로 인증 상태를 확인하세요.",
+                                    authRequired: true,
+                                    suggestion: "UI 화면 생성은 Stitch API(generate_screen_from_text)를 사용하세요. 이미지 에셋(로고, 아이콘)은 Antigravity 인증 후 사용 가능합니다."
+                                }, null, 2)
+                            }],
+                            isError: true
+                        };
+                    }
+
+                    if (isAntigravityAuthenticated()) {
+                        log.info(logT('antigravityGenerating'));
+                        log.info(`  📦 Using model: ${model}`);
+                        result = await generateImageWithGemini(enhancedPrompt, { model, style, aspectRatio }, false);
+                    } else if (forceAntigravityAuth) {
+                        // 사용자가 명시적으로 Antigravity 인증을 요청한 경우
+                        log.info(logT('antigravityAuthStarting'));
+                        log.info(`  📦 Using model: ${model}`);
+                        result = await generateImageWithGemini(enhancedPrompt, { model, style, aspectRatio }, true);
+                    }
+
+                    if (!result || !result.success) {
+                        return {
+                            content: [{
+                                type: "text",
+                                text: JSON.stringify({
+                                    success: false,
+                                    error: result?.error || "이미지 생성 실패",
+                                    message: `${model} 이미지 생성에 실패했습니다.`,
+                                    model: model,
+                                    hint: result?.needsAuth ? "브라우저에서 Antigravity 인증을 완료해주세요." : "다시 시도해주세요. 쿼터 소진 시 다른 모델(gemini-2.5-pro)을 시도해보세요."
+                                }, null, 2)
+                            }],
+                            isError: true
+                        };
+                    }
+
+                    // 배경 제거 처리
+                    let backgroundRemoved = false;
+                    if (removeBackground && result.imageData) {
+                        log.info(logT('processingBackgroundRemoval'));
+                        try {
+                            const originalBuffer = Buffer.from(result.imageData, 'base64');
+
+                            let processedBuffer;
+                            if (backgroundRemovalMode === "auto") {
+                                // 자동 배경색 감지 모드
+                                processedBuffer = await removeBackgroundAuto(originalBuffer, {
+                                    tolerance: backgroundThreshold > 100 ? 30 : backgroundThreshold // auto 모드에서는 tolerance로 사용
+                                });
+                            } else {
+                                // 흰색 배경 제거 모드
+                                processedBuffer = await removeWhiteBackground(originalBuffer, {
+                                    threshold: backgroundThreshold,
+                                    smoothEdges: true
+                                });
+                            }
+
+                            result.imageData = processedBuffer.toString('base64');
+                            result.backgroundRemoved = true;
+                            backgroundRemoved = true;
+                            log.success(logT('backgroundRemovalDone'));
+                        } catch (bgErr) {
+                            log.warn(logT('backgroundRemovalWarn', bgErr.message));
+                        }
+                    }
+
+                    // 파일로 저장
+                    let savedPath = null;
+                    if (saveToFile && result.imageData) {
+                        const timestamp = Date.now();
+                        const fileName = `${assetType}_${timestamp}.png`;
+                        savedPath = path.join(process.cwd(), fileName);
+                        fs.writeFileSync(savedPath, Buffer.from(result.imageData, 'base64'));
+                        log.success(logT('imageSaved', fileName));
+                    }
+
+                    return {
+                        content: [
+                            {
+                                type: "text",
+                                text: JSON.stringify({
+                                    success: true,
+                                    assetType,
+                                    prompt: result.prompt,
+                                    style,
+                                    savedPath,
+                                    generatedBy: "Gemini 3 Pro (Antigravity)",
+                                    backgroundRemoved: backgroundRemoved,
+                                    backgroundRemovalMode: backgroundRemoved ? backgroundRemovalMode : null,
+                                    message: `✅ ${assetType} 이미지가 ${usedMethod === "antigravity" ? "Gemini 3 Pro" : "Stitch API"}로 생성되었습니다.${backgroundRemoved ? ' (배경 투명 처리됨)' : ''}`
+                                }, null, 2)
+                            },
+                            ...(result.imageData ? [{
+                                type: "image",
+                                data: result.imageData,
+                                mimeType: result.mimeType || "image/png"
+                            }] : [])
+                        ]
+                    };
+
+                } catch (err) {
+                    return { content: [{ type: "text", text: `Error generating asset: ${err.message}` }], isError: true };
+                }
+            }
+
+            // orchestrate_design - 오케스트레이션 (에셋 생성 + UI 생성)
+            if (name === "orchestrate_design") {
+                try {
+                    const {
+                        description,
+                        autoGenerateAssets = true,
+                        assetHints = {},
+                        designPreferences = {},
+                        deviceType = "MOBILE",
+                        forceAntigravityAuth = false
+                    } = args;
+
+                    log.info(logT('orchestrationStarting', description));
+
+                    const orchestrationResult = {
+                        stage: "analysis",
+                        description,
+                        generatedAssets: [],
+                        screenResult: null,
+                        errors: [],
+                        imageGenerationMethod: "none"
+                    };
+
+                    // 이미지 생성 헬퍼 함수 (Antigravity/Gemini 3 Pro 전용)
+                    const generateAssetImage = async (prompt, options = {}) => {
+                        // Antigravity 인증 확인
+                        if (isAntigravityAuthenticated()) {
+                            const result = await generateImageWithGemini(prompt, options, false);
+                            if (result.success) {
+                                orchestrationResult.imageGenerationMethod = "antigravity";
+
+                                // 배경 제거 적용 (로고, 아이콘에 자동 적용)
+                                if (options.assetType === "logo" || options.assetType === "icon") {
+                                    try {
+                                        const originalBuffer = Buffer.from(result.imageData, 'base64');
+                                        const processedBuffer = await removeWhiteBackground(originalBuffer, { threshold: 240 });
+                                        result.imageData = processedBuffer.toString('base64');
+                                        result.backgroundRemoved = true;
+                                        log.info(logT('autoBackgroundRemovalDone'));
+                                    } catch (e) {
+                                        log.warn(logT('autoBackgroundRemovalWarn', e.message));
+                                    }
+                                }
+                                return result;
+                            }
+                            return result;
+                        } else if (forceAntigravityAuth) {
+                            const result = await generateImageWithGemini(prompt, options, true);
+                            if (result.success) {
+                                orchestrationResult.imageGenerationMethod = "antigravity";
+                                // 배경 제거
+                                if (options.assetType === "logo" || options.assetType === "icon") {
+                                    try {
+                                        const originalBuffer = Buffer.from(result.imageData, 'base64');
+                                        const processedBuffer = await removeWhiteBackground(originalBuffer, { threshold: 240 });
+                                        result.imageData = processedBuffer.toString('base64');
+                                        result.backgroundRemoved = true;
+                                    } catch (e) {}
+                                }
+                            }
+                            return result;
+                        }
+
+                        // Antigravity 미인증 - 에셋 생성 불가
+                        return {
+                            success: false,
+                            error: "Antigravity 인증이 필요합니다.",
+                            needsAuth: true
+                        };
+                    };
+
+                    // 1. 필요한 에셋 분석 및 생성
+                    if (autoGenerateAssets) {
+                        orchestrationResult.stage = "asset_generation";
+
+                        const {
+                            needsLogo = true,
+                            needsHeroImage = true,
+                            needsIcons = false,
+                            customAssets = []
+                        } = assetHints;
+
+                        const { style = "modern", colorScheme = "", mood = "" } = designPreferences;
+
+                        // 이미지 생성 방식 안내
+                        if (isAntigravityAuthenticated()) {
+                            log.info(logT('antigravityGeneratingAssets'));
+                        } else if (forceAntigravityAuth) {
+                            log.info(logT('antigravityAuthStartingAssets'));
+                        } else {
+                            log.warn(logT('antigravityNotAuthSkipping'));
+                            log.info(logT('antigravityNotAuthTip'));
+                        }
+
+                        // 로고 생성
+                        if (needsLogo) {
+                            log.info(logT('generatingLogo'));
+                            const logoPrompt = `Logo for: ${description}. ${mood ? `Mood: ${mood}.` : ""} ${colorScheme ? `Colors: ${colorScheme}.` : ""}`;
+                            const logoResult = await generateAssetImage(logoPrompt, { style, assetType: "logo" });
+
+                            if (logoResult.success) {
+                                const fileName = `logo_${Date.now()}.png`;
+                                fs.writeFileSync(path.join(process.cwd(), fileName), Buffer.from(logoResult.imageData, 'base64'));
+                                orchestrationResult.generatedAssets.push({
+                                    type: "logo",
+                                    fileName,
+                                    imageData: logoResult.imageData,
+                                    source: logoResult.source || "unknown"
+                                });
+                                log.success(logT('logoGenComplete', fileName));
+                            } else {
+                                orchestrationResult.errors.push({ type: "logo", error: logoResult.error });
+                            }
+                        }
+
+                        // 히어로 이미지 생성
+                        if (needsHeroImage) {
+                            log.info(logT('generatingHero'));
+                            const heroPrompt = `Hero banner image for: ${description}. ${mood ? `Mood: ${mood}.` : ""} ${colorScheme ? `Colors: ${colorScheme}.` : ""} Wide format, impactful.`;
+                            const heroResult = await generateAssetImage(heroPrompt, { style, aspectRatio: "16:9", assetType: "hero" });
+
+                            if (heroResult.success) {
+                                const fileName = `hero_${Date.now()}.png`;
+                                fs.writeFileSync(path.join(process.cwd(), fileName), Buffer.from(heroResult.imageData, 'base64'));
+                                orchestrationResult.generatedAssets.push({
+                                    type: "hero",
+                                    fileName,
+                                    imageData: heroResult.imageData,
+                                    source: heroResult.source || "unknown"
+                                });
+                                log.success(logT('heroGenComplete', fileName));
+                            } else {
+                                orchestrationResult.errors.push({ type: "hero", error: heroResult.error });
+                            }
+                        }
+
+                        // 아이콘 세트 생성
+                        if (needsIcons) {
+                            log.info(logT('generatingIcon'));
+                            const iconPrompt = `Icon set for: ${description}. Simple, flat, UI icons. ${colorScheme ? `Colors: ${colorScheme}.` : ""}`;
+                            const iconResult = await generateAssetImage(iconPrompt, { style: "flat", assetType: "icon" });
+
+                            if (iconResult.success) {
+                                const fileName = `icons_${Date.now()}.png`;
+                                fs.writeFileSync(path.join(process.cwd(), fileName), Buffer.from(iconResult.imageData, 'base64'));
+                                orchestrationResult.generatedAssets.push({
+                                    type: "icons",
+                                    fileName,
+                                    imageData: iconResult.imageData,
+                                    source: iconResult.source || "unknown"
+                                });
+                                log.success(logT('iconGenComplete', fileName));
+                            } else {
+                                orchestrationResult.errors.push({ type: "icons", error: iconResult.error });
+                            }
+                        }
+
+                        // 커스텀 에셋 생성
+                        for (const customAsset of customAssets) {
+                            log.info(logT('generatingCustomAsset', customAsset));
+                            const customResult = await generateAssetImage(`${customAsset} for: ${description}`, { style, assetType: "illustration" });
+
+                            if (customResult.success) {
+                                const fileName = `custom_${Date.now()}.png`;
+                                fs.writeFileSync(path.join(process.cwd(), fileName), Buffer.from(customResult.imageData, 'base64'));
+                                orchestrationResult.generatedAssets.push({
+                                    type: "custom",
+                                    description: customAsset,
+                                    fileName,
+                                    imageData: customResult.imageData,
+                                    source: customResult.source || "unknown"
+                                });
+                                log.success(logT('customAssetGenComplete', fileName));
+                            } else {
+                                orchestrationResult.errors.push({ type: "custom", description: customAsset, error: customResult.error });
+                            }
+                        }
+                    }
+
+                    // 2. Stitch API로 UI 생성
+                    orchestrationResult.stage = "ui_generation";
+                    log.info(logT('generatingUIWithStitch'));
+
+                    // 생성된 에셋 정보를 프롬프트에 포함
+                    let enhancedPrompt = description;
+                    if (orchestrationResult.generatedAssets.length > 0) {
+                        const assetList = orchestrationResult.generatedAssets.map(a => a.type).join(", ");
+                        enhancedPrompt += ` (Generated assets available: ${assetList})`;
+                    }
+                    if (designPreferences.style) {
+                        enhancedPrompt += ` Style: ${designPreferences.style}.`;
+                    }
+                    if (designPreferences.colorScheme) {
+                        enhancedPrompt += ` Colors: ${designPreferences.colorScheme}.`;
+                    }
+
+                    const screenResult = await callStitchAPI("tools/call", {
+                        name: "generate_screen_from_text",
+                        arguments: {
+                            projectId: args.projectId,
+                            text: enhancedPrompt,
+                            deviceType: deviceType
+                        }
+                    }, args.projectId, token);
+
+                    orchestrationResult.screenResult = screenResult.result;
+                    orchestrationResult.stage = "complete";
+
+                    log.success(logT('orchestrationComplete'));
+
+                    return {
+                        content: [
+                            {
+                                type: "text",
+                                text: JSON.stringify({
+                                    success: true,
+                                    message: "🎭 디자인 오케스트레이션 완료!",
+                                    summary: {
+                                        assetsGenerated: orchestrationResult.generatedAssets.length,
+                                        assetTypes: orchestrationResult.generatedAssets.map(a => a.type),
+                                        errors: orchestrationResult.errors.length
+                                    },
+                                    generatedAssets: orchestrationResult.generatedAssets.map(a => ({
+                                        type: a.type,
+                                        fileName: a.fileName
+                                    })),
+                                    screenResult: orchestrationResult.screenResult,
+                                    errors: orchestrationResult.errors
+                                }, null, 2)
+                            },
+                            // 생성된 에셋 이미지들 첨부
+                            ...orchestrationResult.generatedAssets.map(asset => ({
+                                type: "image",
+                                data: asset.imageData,
+                                mimeType: "image/png"
+                            }))
+                        ]
+                    };
+
+                } catch (err) {
+                    return { content: [{ type: "text", text: `Error in orchestration: ${err.message}` }], isError: true };
+                }
+            }
+
             // 기본 Stitch API
             try {
                 const result = await callStitchAPI("tools/call", { name, arguments: args || {} }, projectId, token);
+
+                // ========== create_project 후 자동 저장 ==========
+                if (name === 'create_project' && result.result) {
+                    // 생성된 프로젝트 정보 추출
+                    let newProjectId = null;
+                    let newProjectName = null;
+
+                    // result.result 구조에서 프로젝트 ID와 이름 찾기
+                    const findProjectInfo = (obj) => {
+                        if (!obj || typeof obj !== 'object') return;
+                        if (obj.name && typeof obj.name === 'string' && obj.name.includes('projects/')) {
+                            newProjectId = obj.name;
+                        }
+                        if (obj.displayName && typeof obj.displayName === 'string') {
+                            newProjectName = obj.displayName;
+                        }
+                        if (obj.title && typeof obj.title === 'string' && !newProjectName) {
+                            newProjectName = obj.title;
+                        }
+                        for (const key in obj) {
+                            if (typeof obj[key] === 'object') findProjectInfo(obj[key]);
+                        }
+                    };
+                    findProjectInfo(result.result);
+
+                    // 프로젝트 정보를 워크스페이스에 저장
+                    if (newProjectId) {
+                        setActiveProject(newProjectId, newProjectName || args?.title);
+                        log.success(systemLocale === 'ko'
+                            ? `✨ 새 프로젝트가 생성되고 워크스페이스에 저장되었습니다: ${newProjectName || newProjectId}`
+                            : `✨ New project created and saved to workspace: ${newProjectName || newProjectId}`);
+                    }
+                }
+
+                // ========== list_projects에 워크스페이스 프로젝트 정보 추가 ==========
+                if (name === 'list_projects' && result.result) {
+                    const localProject = loadLocalProject();
+                    if (localProject) {
+                        // 응답에 워크스페이스 프로젝트 정보 추가
+                        result.result._workspaceProject = {
+                            projectId: localProject.projectId,
+                            projectName: localProject.projectName,
+                            lastUsed: localProject.lastUsed,
+                            hint: systemLocale === 'ko'
+                                ? "💡 이 워크스페이스에 저장된 프로젝트입니다. projectId를 생략하면 자동으로 사용됩니다."
+                                : "💡 This project is saved in the current workspace. It will be used automatically if projectId is omitted."
+                        };
+                    }
+                }
 
                 // 자동 다운로드
                 if (result.result) {
@@ -3199,14 +4936,14 @@ module.exports = {
             };
         });
 
-        server.onerror = (err) => log.error(`Server error: ${err}`);
+        server.onerror = (err) => log.error(logT('serverError', err));
 
         const transport = new StdioServerTransport();
         await server.connect(transport);
-        log.success(`Ready! (${projectId})`);
+        log.success(logT('ready', projectId));
 
     } catch (error) {
-        log.error(`Fatal: ${error.message}`);
+        log.error(logT('fatal', error.message));
         process.exit(1);
     }
 }

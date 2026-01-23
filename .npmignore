@@ -4,3 +4,18 @@ node_modules/
 stitch-key.json
 *.tgz
 .DS_Store
+
+# Test files
+test-*.js
+test_*.js
+
+# User settings
+.stitch-project.json
+.env
+
+# Keys
+*.key
+*.pem
+
+# Internal docs
+ANTIGRAVITY-MODELS.md

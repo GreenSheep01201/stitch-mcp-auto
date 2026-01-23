@@ -36,3 +36,6 @@ gen_url.js
 
 # Sisyphus agent state
 .sisyphus/
+
+# User project settings
+.stitch-project.json

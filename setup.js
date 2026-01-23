@@ -18,7 +18,27 @@ const { execSync, spawn } = require('child_process');
 const CONFIG_DIR = path.join(os.homedir(), '.stitch-mcp-auto');
 const TOKEN_PATH = path.join(CONFIG_DIR, 'tokens.json');
 const CONFIG_PATH = path.join(CONFIG_DIR, 'config.json');
+const ANTIGRAVITY_TOKEN_PATH = path.join(CONFIG_DIR, 'antigravity_tokens.json');
 const SKILLS_SOURCE_DIR = path.join(__dirname, 'skills');
+
+// Antigravity OAuth 설정 (이미지 생성용) - opencode 방식
+const ANTIGRAVITY_CLIENT_ID = '1071006060591-tmhssin2h21lcre235vtolojh4g403ep.apps.googleusercontent.com';
+const ANTIGRAVITY_CLIENT_SECRET = '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';
+const ANTIGRAVITY_REDIRECT_URI = 'http://localhost:51121/antigravity-callback';
+const ANTIGRAVITY_SCOPES = [
+    'https://www.googleapis.com/auth/cloud-platform',
+    'https://www.googleapis.com/auth/userinfo.email',
+    'https://www.googleapis.com/auth/userinfo.profile',
+    'https://www.googleapis.com/auth/cclog',
+    'https://www.googleapis.com/auth/experimentsandconfigs'
+];
+const ANTIGRAVITY_ENDPOINTS = {
+    auth: 'https://accounts.google.com/o/oauth2/v2/auth',
+    token: 'https://oauth2.googleapis.com/token',
+    daily: 'https://daily-cloudcode-pa.sandbox.googleapis.com',
+    autopush: 'https://autopush-cloudcode-pa.sandbox.googleapis.com',
+    prod: 'https://cloudcode-pa.googleapis.com'
+};
 // CLI-specific command installation paths
 const CLI_TARGETS = {
     claude: path.join(os.homedir(), '.claude', 'commands'),
@@ -58,6 +78,17 @@ const i18n = {
         consoleCommandsInstalled2: 'commands installed',
         consoleLoginFailed: 'Login failed',
         consoleBrowserManual: 'Please open browser manually',
+        consoleAntigravityEnabled: 'Image generation enabled (Antigravity)',
+        consoleAntigravitySkipped: 'Image generation skipped',
+        consoleImageGeneration: 'Image Generation',
+        consoleOpeningAntigravityOAuth: 'Opening Antigravity OAuth...',
+        consoleTryingLoadCodeAssist: 'Trying loadCodeAssist',
+        consoleProjectIdFound: 'Project ID found',
+        consoleLoadCodeAssistError: 'loadCodeAssist error',
+        consoleAntigravityAuthSuccess: 'Antigravity authentication successful',
+        consoleAntigravityOAuthError: 'Antigravity OAuth error',
+        consoleServerError: 'Error',
+        consoleCanCloseWindow: 'You can close this window.',
 
         // HTML pages - Welcome
         welcomeGcloudRequired: 'gcloud CLI Required',
@@ -111,10 +142,29 @@ const i18n = {
         completeCommands: 'commands',
         completeSkills: 'skills',
 
+        // HTML pages - Antigravity Choice
+        antigravityChoiceTitle: 'Enable Image Generation?',
+        antigravityChoiceSubtitle: 'Antigravity / Gemini 3 Pro',
+        antigravityChoiceDescription: 'AI-powered image generation for design assets (icons, illustrations, backgrounds).<br>This feature is <strong>optional</strong>.',
+        antigravityChoiceYes: 'Yes, enable it',
+        antigravityChoiceNo: 'No, UI only',
+        antigravityChoiceYesDesc: 'Generate images with Gemini 3 Pro',
+        antigravityChoiceNoDesc: 'Skip image generation, design UI screens only',
+
+        // HTML pages - Antigravity Auth
+        antigravityTitle: 'Image Generation Setup',
+        antigravitySubtitle: 'Antigravity / Gemini 3 Pro',
+        antigravityDescription: 'Click the button below to authenticate with Google.',
+        antigravityLoginButton: 'Authenticate',
+        antigravityWaiting: 'Waiting for authentication...',
+        antigravityComplete: 'Image generation enabled!',
+        antigravitySkipped: 'Skipped - UI generation only',
+
         // Steps
         stepLogin: 'Login',
         stepProject: 'Project',
         stepAPI: 'API',
+        stepAntigravity: 'Images',
         stepComplete: 'Complete',
     },
     ko: {
@@ -137,6 +187,17 @@ const i18n = {
         consoleCommandsInstalled2: '개 명령어 설치됨',
         consoleLoginFailed: '로그인 실패',
         consoleBrowserManual: '브라우저를 수동으로 열어주세요',
+        consoleAntigravityEnabled: '이미지 생성 활성화됨 (Antigravity)',
+        consoleAntigravitySkipped: '이미지 생성 건너뜀',
+        consoleImageGeneration: '이미지 생성',
+        consoleOpeningAntigravityOAuth: 'Antigravity OAuth 열기...',
+        consoleTryingLoadCodeAssist: 'loadCodeAssist 시도',
+        consoleProjectIdFound: '프로젝트 ID 발견',
+        consoleLoadCodeAssistError: 'loadCodeAssist 오류',
+        consoleAntigravityAuthSuccess: 'Antigravity 인증 성공',
+        consoleAntigravityOAuthError: 'Antigravity OAuth 오류',
+        consoleServerError: '오류',
+        consoleCanCloseWindow: '이 창을 닫아도 됩니다.',
 
         // HTML pages - Welcome
         welcomeGcloudRequired: 'gcloud CLI 필요',
@@ -190,10 +251,29 @@ const i18n = {
         completeCommands: '개 명령어',
         completeSkills: '개 스킬',
 
+        // HTML pages - Antigravity Choice
+        antigravityChoiceTitle: '이미지 생성 활성화?',
+        antigravityChoiceSubtitle: 'Antigravity / Gemini 3 Pro',
+        antigravityChoiceDescription: '디자인 에셋(아이콘, 일러스트, 배경)을 위한 AI 이미지 생성입니다.<br>이 기능은 <strong>선택 사항</strong>입니다.',
+        antigravityChoiceYes: '예, 활성화',
+        antigravityChoiceNo: '아니오, UI만',
+        antigravityChoiceYesDesc: 'Gemini 3 Pro로 이미지 생성',
+        antigravityChoiceNoDesc: '이미지 생성 건너뛰기, UI 화면만 디자인',
+
+        // HTML pages - Antigravity Auth
+        antigravityTitle: '이미지 생성 설정',
+        antigravitySubtitle: 'Antigravity / Gemini 3 Pro',
+        antigravityDescription: '아래 버튼을 클릭하여 Google 인증을 진행하세요.',
+        antigravityLoginButton: '인증하기',
+        antigravityWaiting: '인증 대기 중...',
+        antigravityComplete: '이미지 생성 활성화 완료!',
+        antigravitySkipped: '건너뜀 - UI 생성만 사용',
+
         // Steps
         stepLogin: '로그인',
         stepProject: '프로젝트',
         stepAPI: 'API',
+        stepAntigravity: '이미지',
         stepComplete: '완료',
     }
 };
@@ -208,6 +288,8 @@ let setupState = {
     projects: [],
     selectedProject: null,
     apiEnabled: false,
+    antigravityEnabled: false,
+    antigravitySkipped: false,
     error: null
 };
 
@@ -391,7 +473,7 @@ const baseStyle = `
 `;
 
 function createPage(content, currentStep = 1) {
-    const steps = [t.stepLogin, t.stepProject, t.stepAPI, t.stepComplete];
+    const steps = [t.stepLogin, t.stepProject, t.stepAPI, t.stepAntigravity, t.stepComplete];
     const stepDots = steps.map((s, i) => {
         let cls = 'step-dot';
         if (i + 1 < currentStep) cls += ' done';
@@ -579,7 +661,7 @@ function apiPage() {
                     .then(r => r.json())
                     .then(data => {
                         if (data.enabled) {
-                            window.location.href = '/complete';
+                            window.location.href = '/antigravity-choice';
                         } else {
                             setTimeout(checkApi, 3000);
                         }
@@ -588,10 +670,83 @@ function apiPage() {
             }
             // Check if already enabled
             fetch('/check-api').then(r => r.json()).then(data => {
-                if (data.enabled) window.location.href = '/complete';
+                if (data.enabled) window.location.href = '/antigravity-choice';
             });
         </script>
     `, 3);
+}
+
+function antigravityChoicePage() {
+    return createPage(`
+        <div class="icon">🎨</div>
+        <h1>${t.antigravityChoiceTitle}</h1>
+        <p class="subtitle">${t.antigravityChoiceSubtitle}</p>
+        <p style="color: #666; margin-bottom: 32px;">
+            ${t.antigravityChoiceDescription}
+        </p>
+        <div style="display: flex; gap: 16px; justify-content: center; flex-wrap: wrap;">
+            <div style="flex: 1; min-width: 200px; max-width: 220px;">
+                <a href="/antigravity-auth" class="btn btn-success" style="display: block; margin-bottom: 8px;">
+                    ✅ ${t.antigravityChoiceYes}
+                </a>
+                <p style="font-size: 12px; color: #666;">${t.antigravityChoiceYesDesc}</p>
+            </div>
+            <div style="flex: 1; min-width: 200px; max-width: 220px;">
+                <a href="/antigravity-skip" class="btn btn-secondary" style="display: block; margin-bottom: 8px;">
+                    ⏭️ ${t.antigravityChoiceNo}
+                </a>
+                <p style="font-size: 12px; color: #666;">${t.antigravityChoiceNoDesc}</p>
+            </div>
+        </div>
+    `, 4);
+}
+
+function antigravityAuthPage() {
+    return createPage(`
+        <div class="icon"><div class="loading"></div></div>
+        <h1>${t.antigravityTitle}</h1>
+        <p class="subtitle">${t.antigravitySubtitle}</p>
+        <p style="color: #666; margin-bottom: 24px;">
+            ${t.antigravityDescription}
+        </p>
+        <button class="btn" onclick="startAntigravityAuth()" id="authBtn">
+            🔐 ${t.antigravityLoginButton}
+        </button>
+        <p id="status" class="progress-text" style="margin-top: 24px;"></p>
+        <script>
+            let authStarted = false;
+            function startAntigravityAuth() {
+                if (authStarted) return;
+                authStarted = true;
+                document.getElementById('authBtn').disabled = true;
+                document.getElementById('authBtn').style.opacity = '0.5';
+                document.getElementById('status').innerHTML =
+                    '<div class="loading" style="display:inline-block;width:16px;height:16px;vertical-align:middle;"></div> ${t.antigravityWaiting}';
+
+                fetch('/start-antigravity-auth').then(() => {
+                    checkAntigravityAuth();
+                });
+            }
+            function checkAntigravityAuth() {
+                fetch('/check-antigravity-auth')
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.authenticated) {
+                            document.getElementById('status').innerHTML =
+                                '<span style="color: #27ae60;">✅ ${t.antigravityComplete}</span>';
+                            setTimeout(() => {
+                                window.location.href = '/complete';
+                            }, 1000);
+                        } else {
+                            setTimeout(checkAntigravityAuth, 2000);
+                        }
+                    })
+                    .catch(() => setTimeout(checkAntigravityAuth, 2000));
+            }
+            // Auto-start auth
+            startAntigravityAuth();
+        </script>
+    `, 4);
 }
 
 function completePage(skillsResult = null) {
@@ -659,12 +814,18 @@ function completePage(skillsResult = null) {
         }
     }
 
+    // Antigravity status
+    const antigravityStatus = setupState.antigravityEnabled
+        ? '✅ Enabled (Gemini 3 Pro)'
+        : '⏭️ Skipped (UI only)';
+
     return createPage(`
         <div class="icon">🎉</div>
         <h1>${t.completeTitle}</h1>
         <p class="subtitle success">${t.completeSubtitle}</p>
         <div class="info-box">Project: ${projectId}
 Tokens: ~/.stitch-mcp-auto/tokens.json
+Image Generation: ${antigravityStatus}
 
 Commands installed to:
 ├─ Claude Code: ~/.claude/commands/
@@ -681,7 +842,7 @@ Commands installed to:
                 alert('${t.completeCopied}');
             }
         </script>
-    `, 4);
+    `, 5);
 }
 
 function escapeHtml(str) {
@@ -929,6 +1090,7 @@ function openBrowser(url) {
 // Start server
 let loginInProgress = false;
 let loginStarted = false;
+let antigravityAuthInProgress = false;
 
 async function startServer() {
     // Check initial state
@@ -1037,6 +1199,170 @@ async function startServer() {
                 res.writeHead(200, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({ enabled }));
             }
+            // Antigravity choice page
+            else if (pathname === '/antigravity-choice') {
+                res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+                res.end(antigravityChoicePage());
+            }
+            // Antigravity auth page
+            else if (pathname === '/antigravity-auth') {
+                res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+                res.end(antigravityAuthPage());
+            }
+            // Skip Antigravity
+            else if (pathname === '/antigravity-skip') {
+                setupState.antigravitySkipped = true;
+                setupState.antigravityEnabled = false;
+                console.log(`⏭️ ${t.antigravitySkipped}`);
+                res.writeHead(302, { Location: '/complete' });
+                res.end();
+            }
+            // Start Antigravity OAuth
+            else if (pathname === '/start-antigravity-auth') {
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+
+                if (!antigravityAuthInProgress) {
+                    antigravityAuthInProgress = true;
+
+                    // Build OAuth URL
+                    const authUrl = new URL(ANTIGRAVITY_ENDPOINTS.auth);
+                    authUrl.searchParams.set('client_id', ANTIGRAVITY_CLIENT_ID);
+                    authUrl.searchParams.set('response_type', 'code');
+                    authUrl.searchParams.set('redirect_uri', ANTIGRAVITY_REDIRECT_URI);
+                    authUrl.searchParams.set('scope', ANTIGRAVITY_SCOPES.join(' '));
+                    authUrl.searchParams.set('access_type', 'offline');
+                    authUrl.searchParams.set('prompt', 'consent');
+
+                    console.log(`🔐 ${t.consoleOpeningAntigravityOAuth}`);
+                    openBrowser(authUrl.toString());
+                }
+
+                res.end(JSON.stringify({ status: 'started' }));
+            }
+            // Check Antigravity auth
+            else if (pathname === '/check-antigravity-auth') {
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ authenticated: setupState.antigravityEnabled }));
+            }
+            // Antigravity OAuth callback
+            else if (pathname === '/antigravity-callback') {
+                const code = parsedUrl.searchParams.get('code');
+                const error = parsedUrl.searchParams.get('error');
+
+                if (error) {
+                    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+                    res.end(`<h1>❌ Error: ${error}</h1><script>setTimeout(() => window.close(), 3000);</script>`);
+                    antigravityAuthInProgress = false;
+                    return;
+                }
+
+                if (code) {
+                    try {
+                        // Exchange code for tokens
+                        const tokenResponse = await fetch(ANTIGRAVITY_ENDPOINTS.token, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                            body: new URLSearchParams({
+                                client_id: ANTIGRAVITY_CLIENT_ID,
+                                client_secret: ANTIGRAVITY_CLIENT_SECRET,
+                                code: code,
+                                grant_type: 'authorization_code',
+                                redirect_uri: ANTIGRAVITY_REDIRECT_URI,
+                            }).toString()
+                        });
+
+                        const tokens = await tokenResponse.json();
+
+                        if (tokens.access_token) {
+                            // Fetch project ID via loadCodeAssist
+                            let projectId = '';
+                            const loadEndpoints = [ANTIGRAVITY_ENDPOINTS.daily, ANTIGRAVITY_ENDPOINTS.autopush, ANTIGRAVITY_ENDPOINTS.prod];
+
+                            for (const endpoint of loadEndpoints) {
+                                try {
+                                    const endpointName = endpoint.includes('daily') ? 'daily' :
+                                                       endpoint.includes('autopush') ? 'autopush' : 'prod';
+                                    console.log(`  📡 ${t.consoleTryingLoadCodeAssist}: ${endpointName}...`);
+
+                                    const loadResponse = await fetch(endpoint + '/v1internal:loadCodeAssist', {
+                                        method: 'POST',
+                                        headers: {
+                                            'Authorization': 'Bearer ' + tokens.access_token,
+                                            'Content-Type': 'application/json',
+                                            'User-Agent': 'antigravity/1.11.5 windows/amd64',
+                                            'X-Goog-Api-Client': 'google-cloud-sdk vscode_cloudshelleditor/0.1',
+                                            'Client-Metadata': JSON.stringify({
+                                                ideType: 'IDE_UNSPECIFIED',
+                                                platform: 'PLATFORM_UNSPECIFIED',
+                                                pluginType: 'GEMINI'
+                                            })
+                                        },
+                                        body: JSON.stringify({
+                                            metadata: {
+                                                ideType: 'IDE_UNSPECIFIED',
+                                                platform: 'PLATFORM_UNSPECIFIED',
+                                                pluginType: 'GEMINI'
+                                            }
+                                        })
+                                    });
+
+                                    if (loadResponse.ok) {
+                                        const loadData = await loadResponse.json();
+                                        projectId = loadData.cloudaicompanionProject?.id || loadData.cloudaicompanionProject || '';
+                                        if (projectId) {
+                                            console.log(`  ✅ ${t.consoleProjectIdFound}: ${projectId}`);
+                                            break;
+                                        }
+                                    }
+                                } catch (e) {
+                                    console.log(`  ⚠️ ${t.consoleLoadCodeAssistError}: ${e.message}`);
+                                }
+                            }
+
+                            // Save tokens with project_id
+                            const tokenData = {
+                                access_token: tokens.access_token,
+                                refresh_token: tokens.refresh_token,
+                                expiry_date: Date.now() + (tokens.expires_in * 1000),
+                                token_type: tokens.token_type,
+                                project_id: projectId
+                            };
+
+                            if (!fs.existsSync(CONFIG_DIR)) {
+                                fs.mkdirSync(CONFIG_DIR, { recursive: true });
+                            }
+                            fs.writeFileSync(ANTIGRAVITY_TOKEN_PATH, JSON.stringify(tokenData, null, 2));
+
+                            setupState.antigravityEnabled = true;
+                            console.log(`✅ ${t.consoleAntigravityAuthSuccess} (Project: ${projectId || 'N/A'})`);
+
+                            res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+                            res.end(`
+                                <html>
+                                <head><style>
+                                    body { font-family: -apple-system, sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+                                    .card { background: white; padding: 48px; border-radius: 24px; text-align: center; box-shadow: 0 25px 50px rgba(0,0,0,0.25); }
+                                </style></head>
+                                <body>
+                                    <div class="card">
+                                        <h1>✅ ${t.antigravityComplete}</h1>
+                                        <p>${t.consoleCanCloseWindow}</p>
+                                    </div>
+                                    <script>setTimeout(() => window.close(), 2000);</script>
+                                </body>
+                                </html>
+                            `);
+                        } else {
+                            throw new Error(tokens.error || 'Token exchange failed');
+                        }
+                    } catch (e) {
+                        console.error(`${t.consoleAntigravityOAuthError}:`, e.message);
+                        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+                        res.end(`<h1>❌ Error: ${e.message}</h1>`);
+                    }
+                    antigravityAuthInProgress = false;
+                }
+            }
             // Complete
             else if (pathname === '/complete') {
                 const skillsResult = saveTokens(setupState.selectedProject);
@@ -1049,6 +1375,7 @@ async function startServer() {
                     console.log(`\n🎉 ${t.consoleSetupComplete}`);
                     console.log(`   ${t.consoleProject}: ${setupState.selectedProject}`);
                     console.log(`   ${t.consoleTokens}: ${TOKEN_PATH}`);
+                    console.log(`   ${t.consoleImageGeneration}: ${setupState.antigravityEnabled ? t.consoleAntigravityEnabled : t.consoleAntigravitySkipped}`);
                     console.log(`\n   ${t.consoleCommandsInstalled}:`);
                     console.log(`   ├─ Claude Code: ${CLI_TARGETS.claude}`);
                     console.log(`   ├─ Gemini CLI:  ${CLI_TARGETS.gemini}`);
@@ -1067,7 +1394,7 @@ async function startServer() {
                 res.end('Not Found');
             }
         } catch (e) {
-            console.error('Error:', e);
+            console.error(`${t.consoleServerError}:`, e);
             res.writeHead(500);
             res.end('Error: ' + e.message);
         }

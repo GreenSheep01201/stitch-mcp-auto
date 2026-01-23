@@ -9,7 +9,7 @@
 One command setup, instant UI design generation. The most automated MCP server for Google Stitch.
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Version-1.0.0-blue" alt="Version">
+  <img src="https://img.shields.io/badge/Version-1.1.0-blue" alt="Version">
   <img src="https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux%20%7C%20WSL-blue" alt="Platform">
   <img src="https://img.shields.io/badge/License-Apache%202.0-green" alt="License">
   <img src="https://img.shields.io/badge/Node.js-18%2B-brightgreen" alt="Node.js">
@@ -18,8 +18,10 @@ One command setup, instant UI design generation. The most automated MCP server f
 **Features:**
 - **Auto Setup** - One command installs everything (gcloud auth, API enable, MCP config)
 - **Multi-CLI Support** - Works with Claude Code, Gemini CLI, Codex CLI
-- **19 Professional Tools** - Design generation, accessibility checks, design system export
-- **5 Workflow Commands** - `/design`, `/design-system`, `/design-flow`, `/design-qa`, `/design-export`
+- **22 Professional Tools** - Design generation, accessibility checks, design system export, AI image generation
+- **7 Workflow Commands** - `/design`, `/design-system`, `/design-flow`, `/design-qa`, `/design-export`, `/generate-asset`, `/design-full`
+- **🎨 AI Image Generation** - Generate logos, icons, hero images via Gemini 3 Pro (optional Antigravity OAuth)
+- **🎭 Orchestration Mode** - One prompt to generate assets + complete UI design
 - **🌐 i18n Support** - Auto-detects system language (English/Korean) for setup wizard and console messages
 
 ---
@@ -235,6 +237,35 @@ Go to **Settings > MCP > Add New Server** and add:
 
 ## Available Tools
 
+### 🔄 Automatic Project Management (NEW)
+
+**No more manual projectId passing!** The server automatically manages project context:
+
+1. **Auto-detection**: When you call tools like `generate_screen_from_text` without `projectId`, it automatically uses the workspace project
+2. **Auto-save**: When you `create_project`, it's automatically saved to `.stitch-project.json` in your current folder
+3. **Session continuity**: Return to the same folder later, and your project is automatically loaded
+
+**How it works:**
+```
+┌─────────────────────────────────────────────────────────────┐
+│  Tool called without projectId                               │
+│                    ↓                                         │
+│  1. Check active session project                            │
+│  2. If none → Load from .stitch-project.json                │
+│  3. If none → Return "PROJECT_REQUIRED" with options        │
+│                    ↓                                         │
+│  User creates/selects project → Auto-saved to workspace     │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Manual workspace tools (optional):**
+
+| Tool | Description |
+|------|-------------|
+| `get_workspace_project` | 🔍 Check current workspace project status |
+| `set_workspace_project` | 💾 Manually associate a project with the workspace |
+| `clear_workspace_project` | 🗑️ Clear workspace project association |
+
 ### Core Stitch API Tools
 
 | Tool | Description |
@@ -280,6 +311,67 @@ Go to **Settings > MCP > Add New Server** and add:
 | `suggest_trending_design` | Applies 2024-2025 UI trends (glassmorphism, bento-grid, gradient-mesh, etc.) to screen generation. |
 | `generate_style_guide` | Generates a comprehensive style guide/design documentation from an existing design. |
 | `export_design_system` | Exports a complete design system package (tokens, components, docs) for developer handoff. |
+
+### 🎨 AI Image Generation Tools (v1.1.0)
+
+These tools have different authentication requirements:
+
+| Tool | Auth Required | Description |
+|------|---------------|-------------|
+| `generate_design_asset` | **Antigravity** | Generate design assets (logo, icon, illustration, hero image, wireframe) using Gemini models. **Requires Antigravity authentication.** Supports model selection (gemini-3-pro, gemini-2.5-pro). |
+| `orchestrate_design` | Stitch + Antigravity | Full orchestration: auto-generates assets (logo, icons, hero) then creates complete UI. Stitch-only users can generate UI pages without custom assets. |
+| `check_antigravity_auth` | None | Check Antigravity OAuth authentication status for image generation features. |
+
+#### Supported Models for Image Generation
+
+| Model | Status | Image Generation | Description |
+|-------|--------|------------------|-------------|
+| `gemini-3-pro` | ✅ Available | ✅ Supported | **Default.** Latest Gemini 3 Pro model with image generation |
+| `gemini-2.5-pro` | ✅ Available | ✅ Supported | Gemini 2.5 Pro model with image generation |
+| `gemini-3-flash` | ✅ Available | ❌ Text only | Fast response model, no image generation |
+| `gemini-2.5-flash` | ✅ Available | ❌ Text only | Fast response model, no image generation |
+
+> **💡 Model Selection:**
+> You can specify a model when calling `generate_design_asset`:
+> ```json
+> {
+>   "assetType": "logo",
+>   "prompt": "Modern tech company logo",
+>   "model": "gemini-3-pro"
+> }
+> ```
+
+> **📋 Role Separation:**
+> - **Stitch API (gcloud auth):** UI page/screen generation - available to all users
+> - **Antigravity OAuth:** Image asset generation (logo, icon, hero) - requires separate authentication
+>
+> Stitch-only users can still create complete UI pages using `generate_screen_from_text`. Antigravity extends this with custom AI-generated assets.
+
+#### 🔲 Background Removal (NEW)
+
+`generate_design_asset` supports automatic background removal for transparent assets:
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `removeBackground` | boolean | `false` | Enable automatic background removal |
+| `backgroundRemovalMode` | `"white"` \| `"auto"` | `"white"` | `white`: Remove white backgrounds. `auto`: Auto-detect solid colors. |
+| `backgroundThreshold` | number | `240` | Threshold for detection (0-255). Higher = more aggressive. |
+
+**Example:**
+```json
+{
+  "assetType": "logo",
+  "prompt": "Modern tech company logo with abstract shapes",
+  "removeBackground": true,
+  "backgroundRemovalMode": "white",
+  "backgroundThreshold": 240
+}
+```
+
+This produces a transparent PNG, ideal for:
+- **Logos** - No white border when placed on colored backgrounds
+- **Icons** - Clean integration into UI designs
+- **Illustrations** - Seamless overlay on any background
 
 ---
 
@@ -329,6 +421,8 @@ When you run `npx -p stitch-mcp-auto stitch-mcp-auto-setup`, the setup wizard au
 | design-flow | `/design-flow` | `/stitch:design-flow` | `$stitch-design-flow` | Generate user flows |
 | design-qa | `/design-qa` | `/stitch:design-qa` | `$stitch-design-qa` | Accessibility & quality checks |
 | design-export | `/design-export` | `/stitch:design-export` | `$stitch-design-export` | Export design system |
+| generate-asset | `/generate-asset` | `/stitch:generate-asset` | `$stitch-generate-asset` | AI image generation (v1.1.0) |
+| design-full | `/design-full` | `/stitch:design-full` | `$stitch-design-full` | Full orchestration mode (v1.1.0) |
 
 ### Usage Examples
 
@@ -362,21 +456,27 @@ Commands are automatically installed to all CLI directories:
 ├── design-system.md
 ├── design-flow.md
 ├── design-qa.md
-└── design-export.md
+├── design-export.md
+├── generate-asset.md        # NEW in v1.1.0
+└── design-full.md           # NEW in v1.1.0
 
 ~/.gemini/commands/stitch/   # Gemini CLI (TOML)
 ├── design.toml
 ├── design-system.toml
 ├── design-flow.toml
 ├── design-qa.toml
-└── design-export.toml
+├── design-export.toml
+├── generate-asset.toml      # NEW in v1.1.0
+└── design-full.toml         # NEW in v1.1.0
 
 ~/.codex/skills/stitch/      # Codex CLI (Skills)
 ├── design.md
 ├── design-system.md
 ├── design-flow.md
 ├── design-qa.md
-└── design-export.md
+├── design-export.md
+├── generate-asset.md        # NEW in v1.1.0
+└── design-full.md           # NEW in v1.1.0
 ```
 
 ---
@@ -482,6 +582,42 @@ Export for developer handoff:
 Export the complete design system from this project including tokens and components
 ```
 
+### AI Image Generation (NEW in v1.1.0)
+
+Generate design assets with AI:
+
+```
+/generate-asset logo "Eco-friendly organic food delivery service called GreenBite"
+```
+
+```
+/generate-asset hero "Modern fintech app showing financial growth" --style gradient --ratio 16:9
+```
+
+```
+/generate-asset icon "Shopping cart with checkmark" --style flat --colors "#4CAF50"
+```
+
+### Full Design Orchestration (NEW in v1.1.0)
+
+One prompt to complete design - automatically generates assets and creates UI:
+
+```
+/design-full "친환경 유기농 식품 쇼핑몰 메인 페이지. 녹색 테마, 신선한 느낌, 모던한 디자인"
+```
+
+```
+/design-full "AI-powered project management tool landing page. Professional, blue gradient theme, with pricing section"
+```
+
+> **Note:** The orchestration mode automatically:
+> 1. Analyzes required assets (logo, hero, icons)
+> 2. Generates each asset using Gemini 3 Pro (requires Antigravity auth)
+> 3. Creates complete UI screen with Stitch API
+> 4. Returns all assets + final UI in one response
+>
+> **Without Antigravity auth:** UI screen is still generated, but without custom image assets.
+
 ---
 
 ## Troubleshooting
@@ -565,6 +701,7 @@ npx -p stitch-mcp-auto stitch-mcp-auto-setup
 ┌──────────────────────────────────────────────────────────────┐
 │                        User Request                          │
 │              "Create a login page with..."                   │
+│              "/design-full eco-friendly shop"                │
 └──────────────────────────────────────────────────────────────┘
                               │
                               ▼
@@ -580,23 +717,38 @@ npx -p stitch-mcp-auto stitch-mcp-auto-setup
 │  │ setup.js    │  │ index.js    │  │ auth.js     │           │
 │  │ (Auto Setup)│  │ (MCP Server)│  │ (OAuth)     │           │
 │  └─────────────┘  └─────────────┘  └─────────────┘           │
+│                          │                                   │
+│           ┌──────────────┼──────────────┐                   │
+│           ▼              ▼              ▼                   │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐          │
+│  │ UI Design   │  │ Image Gen   │  │ Orchestrate │          │
+│  │ (19 tools)  │  │ (3 tools)   │  │ (combined)  │          │
+│  └─────────────┘  └─────────────┘  └─────────────┘          │
 └──────────────────────────────────────────────────────────────┘
                               │
-                              ▼
-┌──────────────────────────────────────────────────────────────┐
-│                    Google Cloud Platform                     │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐           │
-│  │ gcloud CLI  │  │ OAuth 2.0   │  │ Stitch API  │           │
-│  │ (Auth)      │  │ (Token)     │  │ (UI Gen)    │           │
-│  └─────────────┘  └─────────────┘  └─────────────┘           │
-└──────────────────────────────────────────────────────────────┘
+            ┌─────────────────┼─────────────────┐
+            ▼                                   ▼
+┌─────────────────────────────┐   ┌─────────────────────────────┐
+│   Google Cloud Platform     │   │   Antigravity (Optional)    │
+│  ┌─────────┐  ┌─────────┐   │   │  ┌─────────────────────┐    │
+│  │ gcloud  │  │ Stitch  │   │   │  │ Gemini 3 Pro        │    │
+│  │ CLI     │  │ API     │   │   │  │ (Image Generation)  │    │
+│  │ (Auth)  │  │ (UI Gen)│   │   │  │ FREE via OAuth      │    │
+│  └─────────┘  └─────────┘   │   │  └─────────────────────┘    │
+└─────────────────────────────┘   └─────────────────────────────┘
 ```
+
+> **📋 Role Separation:**
+> - **Stitch API (gcloud):** Handles all UI page/screen generation
+> - **Antigravity OAuth:** Handles image asset generation (logo, icon, hero images)
+>
+> Without Antigravity authentication, `generate_design_asset` will return an error. Use Stitch's `generate_screen_from_text` for UI pages.
 
 ### File Structure
 
 ```
 stitch-mcp-auto/
-├── index.js          # Main MCP server
+├── index.js          # Main MCP server (with Antigravity OAuth)
 ├── setup.js          # Web-based auto setup wizard
 ├── auth.js           # OAuth helper utilities
 ├── package.json      # Dependencies and scripts
@@ -606,14 +758,17 @@ stitch-mcp-auto/
     ├── design-system.md
     ├── design-flow.md
     ├── design-qa.md
-    └── design-export.md
+    ├── design-export.md
+    ├── generate-asset.md    # NEW: AI image generation
+    └── design-full.md       # NEW: Full orchestration
 ```
 
 ### Configuration Files
 
 | File/Directory | Location | Purpose |
 |----------------|----------|---------|
-| `tokens.json` | `~/.stitch-mcp-auto/` | OAuth access tokens |
+| `tokens.json` | `~/.stitch-mcp-auto/` | OAuth access tokens (gcloud) |
+| `antigravity_tokens.json` | `~/.stitch-mcp-auto/` | Antigravity OAuth tokens (optional) |
 | `config.json` | `~/.stitch-mcp-auto/` | Project settings |
 | `commands/` | `~/.claude/commands/` | Claude Code Commands (auto-installed) |
 | `commands/stitch/` | `~/.gemini/commands/stitch/` | Gemini CLI Commands (auto-installed) |

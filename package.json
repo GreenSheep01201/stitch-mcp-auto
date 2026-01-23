@@ -1,7 +1,7 @@
 {
     "name": "stitch-mcp-auto",
-    "version": "1.0.0",
-    "description": "Just let AI handle everything. Universal MCP server for Google Stitch with auto-setup, multi-CLI commands, and professional design workflows.",
+    "version": "1.1.0",
+    "description": "Just let AI handle everything. Universal MCP server for Google Stitch with auto-setup, multi-CLI commands, professional design workflows, and AI image generation via Antigravity/Gemini 3 Pro.",
     "main": "index.js",
     "bin": {
         "stitch-mcp-auto": "index.js",
@@ -37,7 +37,12 @@
         "codex-cli",
         "skills",
         "cursor",
-        "model-context-protocol"
+        "model-context-protocol",
+        "antigravity",
+        "gemini-3-pro",
+        "image-generation",
+        "nano-banana",
+        "orchestration"
     ],
     "author": "greensheep01201 (Seo Won-gil)",
     "license": "Apache-2.0",
@@ -52,6 +57,7 @@
         "@modelcontextprotocol/sdk": "^1.0.0",
         "googleapis": "^144.0.0",
         "node-fetch": "^2.7.0",
-        "open": "^8.4.2"
+        "open": "^8.4.2",
+        "sharp": "^0.33.0"
     }
 }
