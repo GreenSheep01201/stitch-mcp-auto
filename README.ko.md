@@ -9,7 +9,7 @@
 한 번의 명령으로 설정 완료, 즉각적인 UI 디자인 생성. Google Stitch를 위한 가장 자동화된 MCP 서버.
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Version-1.1.0-blue" alt="Version">
+  <img src="https://img.shields.io/badge/Version-1.2.0-blue" alt="Version">
   <img src="https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux%20%7C%20WSL-blue" alt="Platform">
   <img src="https://img.shields.io/badge/License-Apache%202.0-green" alt="License">
   <img src="https://img.shields.io/badge/Node.js-18%2B-brightgreen" alt="Node.js">
@@ -206,7 +206,7 @@ npx -p stitch-mcp-auto stitch-mcp-auto-setup
 1. 설정 실행: `npm run setup` (또는 `npx -p stitch-mcp-auto stitch-mcp-auto-setup`)
 2. 터미널에 표시된 URL 열기 (보통 `http://localhost:51121`)
 3. 브라우저에서 Google 로그인 완료 (gcloud + Stitch API 활성화)
-4. MCP 설정을 클라이언트에 추가 (`.mcp.json` 또는 Claude Desktop 설정)
+4. **⚠️ 중요: MCP 등록 확인** (아래 참조)
 5. 서버 시작: `npm start` 또는 에디터에서 자동 실행
 
 **수동이 필요한 단계:**
@@ -223,9 +223,34 @@ npx -p stitch-mcp-auto stitch-mcp-auto-setup
 - **WSL (Windows 호스트):**
   - Windows PowerShell에서 실행: `Start-Process "http://localhost:51121"`
 
-**검증 (선택):**
+### ⚠️ 설치 후 MCP 등록 확인 (필수)
+
+설정 완료 후 **반드시** MCP 서버가 등록되었는지 확인하세요:
+
+```bash
+# Claude Code
+claude mcp list | grep stitch
+
+# Gemini CLI
+gemini mcp list | grep stitch
+
+# Codex CLI
+codex mcp list | grep stitch
+```
+
+**`stitch`가 목록에 없으면** 수동으로 등록:
+
+| CLI | 수동 등록 명령 |
+|-----|--------------|
+| Claude Code | `claude mcp add -e GOOGLE_CLOUD_PROJECT=YOUR_PROJECT_ID -s user stitch -- npx -y stitch-mcp-auto` |
+| Gemini CLI | `gemini mcp add stitch -- npx -y stitch-mcp-auto --env GOOGLE_CLOUD_PROJECT=YOUR_PROJECT_ID` |
+| Codex CLI | `codex mcp add stitch -- npx -y stitch-mcp-auto --env GOOGLE_CLOUD_PROJECT=YOUR_PROJECT_ID` |
+
+> **확인이 필요한 이유:** 설정 마법사가 config 파일(`~/.claude.json`, `~/.gemini/settings.json`, `~/.codex/config.toml`)에 직접 등록하지만, 설정이 올바른지 확인하는 것이 좋습니다. "MCP 서버를 찾을 수 없음" 오류를 방지하려면 항상 확인하세요.
+
+**기타 검증 (선택):**
 - `node auth.js --status` (토큰 + 프로젝트 상태 확인)
-- `npm start` (서버가 “Ready” 로그 출력)
+- `npm start` (서버가 "Ready" 로그 출력)
 
 ---
 
@@ -288,6 +313,33 @@ node setup.js
 
 #### Claude Code
 
+**🌐 방법 1: CLI 명령어 (권장)**
+
+설정 마법사가 자동으로 `~/.claude.json`에 등록합니다.
+CLI로 수동 추가하려면:
+
+```bash
+claude mcp add -e GOOGLE_CLOUD_PROJECT=YOUR_PROJECT_ID -s user stitch -- npx -y stitch-mcp-auto
+```
+
+또는 `~/.claude.json`을 직접 편집:
+
+```json
+{
+  "mcpServers": {
+    "stitch": {
+      "command": "npx",
+      "args": ["-y", "stitch-mcp-auto"],
+      "env": {
+        "GOOGLE_CLOUD_PROJECT": "YOUR_PROJECT_ID"
+      }
+    }
+  }
+}
+```
+
+**📁 방법 2: 프로젝트별 설정**
+
 프로젝트 루트에 `.mcp.json` 파일 생성:
 
 ```json
@@ -302,6 +354,49 @@ node setup.js
     }
   }
 }
+```
+
+#### Gemini CLI
+
+**🌐 방법 1: CLI 명령어 (권장)**
+
+```bash
+gemini mcp add stitch -- npx -y stitch-mcp-auto --env GOOGLE_CLOUD_PROJECT=YOUR_PROJECT_ID
+```
+
+또는 `~/.gemini/settings.json`을 직접 편집:
+
+```json
+{
+  "mcpServers": {
+    "stitch": {
+      "command": "npx",
+      "args": ["-y", "stitch-mcp-auto"],
+      "env": {
+        "GOOGLE_CLOUD_PROJECT": "YOUR_PROJECT_ID"
+      }
+    }
+  }
+}
+```
+
+#### Codex CLI
+
+**🌐 방법 1: CLI 명령어 (권장)**
+
+```bash
+codex mcp add stitch -- npx -y stitch-mcp-auto --env GOOGLE_CLOUD_PROJECT=YOUR_PROJECT_ID
+```
+
+또는 `~/.codex/config.toml`을 직접 편집:
+
+```toml
+[mcp_servers.stitch]
+command = "npx"
+args = ["-y", "stitch-mcp-auto"]
+
+[mcp_servers.stitch.env]
+GOOGLE_CLOUD_PROJECT = "YOUR_PROJECT_ID"
 ```
 
 #### Cursor
@@ -861,6 +956,11 @@ stitch-mcp-auto/
 | `antigravity_tokens.json` | `~/.stitch-mcp-auto/` | Antigravity OAuth 토큰 (선택사항) |
 | `config.json` | `~/.stitch-mcp-auto/` | 프로젝트 설정 |
 | `.stitch-project.json` | 워크스페이스 루트(현재 폴더) | 워크스페이스용 프로젝트 매핑(자동 저장) |
+| **MCP 설정** | | |
+| `.claude.json` | `~/` | Claude Code MCP 서버 (user scope) |
+| `settings.json` | `~/.gemini/` | Gemini CLI MCP 서버 |
+| `config.toml` | `~/.codex/` | Codex CLI MCP 서버 (TOML 형식) |
+| **명령어** | | |
 | `commands/` | `~/.claude/commands/` | Claude Code 명령어 (자동 설치) |
 | `commands/stitch/` | `~/.gemini/commands/stitch/` | Gemini CLI 명령어 (자동 설치) |
 | `skills/stitch/` | `~/.codex/skills/stitch/` | Codex CLI 스킬 (자동 설치) |

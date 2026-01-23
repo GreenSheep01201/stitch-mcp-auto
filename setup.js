@@ -45,6 +45,25 @@ const CLI_TARGETS = {
     gemini: path.join(os.homedir(), '.gemini', 'commands', 'stitch'),
     codex: path.join(os.homedir(), '.codex', 'skills', 'stitch')
 };
+
+// MCP config paths for each CLI
+const MCP_CONFIG_PATHS = {
+    claude: {
+        json: path.join(os.homedir(), '.claude.json'),
+        cli: 'claude',
+        cliArgs: (projectId) => `mcp add -e GOOGLE_CLOUD_PROJECT=${projectId} -s user stitch -- npx -y stitch-mcp-auto`
+    },
+    gemini: {
+        json: path.join(os.homedir(), '.gemini', 'settings.json'),
+        cli: 'gemini',
+        cliArgs: (projectId) => `mcp add stitch -- npx -y stitch-mcp-auto --env GOOGLE_CLOUD_PROJECT=${projectId}`
+    },
+    codex: {
+        toml: path.join(os.homedir(), '.codex', 'config.toml'),
+        cli: 'codex',
+        cliArgs: (projectId) => `mcp add stitch -- npx -y stitch-mcp-auto --env GOOGLE_CLOUD_PROJECT=${projectId}`
+    }
+};
 const PORT = 51121;
 
 // ============================================================
@@ -749,7 +768,7 @@ function antigravityAuthPage() {
     `, 4);
 }
 
-function completePage(skillsResult = null) {
+function completePage(skillsResult = null, mcpResults = null) {
     const projectId = setupState.selectedProject;
     const config = JSON.stringify({
         mcpServers: {
@@ -814,6 +833,44 @@ function completePage(skillsResult = null) {
         }
     }
 
+    // MCP registration results
+    let mcpInfo = '';
+    if (mcpResults) {
+        const mcpStatusList = [];
+
+        for (const [cli, result] of Object.entries(mcpResults)) {
+            let statusIcon, statusText;
+            if (result.success) {
+                if (result.alreadyInstalled) {
+                    statusIcon = '✓';
+                    statusText = 'Already registered';
+                } else {
+                    statusIcon = '✓';
+                    statusText = result.method === 'cli' ? 'Registered via CLI' : 'Config file updated';
+                }
+            } else {
+                statusIcon = '⚠';
+                statusText = result.error || 'CLI not available';
+            }
+
+            mcpStatusList.push(`
+                <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                    <span>${cli.charAt(0).toUpperCase() + cli.slice(1)}</span>
+                    <span style="color: ${result.success ? '#155724' : '#856404'};">${statusIcon} ${statusText}</span>
+                </div>
+            `);
+        }
+
+        mcpInfo = `
+            <div style="background: #e7f3ff; border-radius: 8px; padding: 12px; margin: 16px 0; text-align: left;">
+                <strong style="color: #004085; display: block; margin-bottom: 12px;">🔌 MCP Server Registration</strong>
+                <div style="color: #004085; font-size: 13px;">
+                    ${mcpStatusList.join('')}
+                </div>
+            </div>
+        `;
+    }
+
     // Antigravity status
     const antigravityStatus = setupState.antigravityEnabled
         ? '✅ Enabled (Gemini 3 Pro)'
@@ -832,6 +889,7 @@ Commands installed to:
 ├─ Gemini CLI:  ~/.gemini/commands/stitch/
 └─ Codex CLI:   ~/.codex/skills/stitch/</div>
         ${skillsInfo}
+        ${mcpInfo}
         <p style="color: #666; margin-bottom: 8px;">${t.completeAddConfig}</p>
         <div class="info-box">${escapeHtml(config)}</div>
         <button class="btn" onclick="copyConfig()">📋 ${t.completeCopyConfig}</button>
@@ -974,6 +1032,136 @@ function installSkills() {
     } catch (e) {
         console.error(`❌ ${t.consoleSkillsError}:`, e.message);
         return { ...result, error: e.message };
+    }
+
+    return result;
+}
+
+// Save MCP settings for all CLIs
+function saveAllMcpSettings(projectId) {
+    const results = {
+        claude: { success: false, alreadyInstalled: false, error: null, method: null },
+        gemini: { success: false, alreadyInstalled: false, error: null, method: null },
+        codex: { success: false, alreadyInstalled: false, error: null, method: null }
+    };
+
+    results.claude = saveMcpSettingsForCli('claude', projectId);
+    results.gemini = saveMcpSettingsForCli('gemini', projectId);
+    results.codex = saveMcpSettingsForCli('codex', projectId);
+
+    return results;
+}
+
+// Save MCP settings for a specific CLI (config file only - CLI commands can block)
+function saveMcpSettingsForCli(cliName, projectId) {
+    const result = { success: false, alreadyInstalled: false, error: null, method: null };
+    const config = MCP_CONFIG_PATHS[cliName];
+
+    if (!config) {
+        result.error = `Unknown CLI: ${cliName}`;
+        return result;
+    }
+
+    // Write directly to config file (CLI commands can hang, so skip them)
+    try {
+        if (config.json) {
+            // JSON config (Claude, Gemini)
+            const configDir = path.dirname(config.json);
+            if (!fs.existsSync(configDir)) {
+                fs.mkdirSync(configDir, { recursive: true });
+            }
+
+            let settings = {};
+            if (fs.existsSync(config.json)) {
+                try {
+                    settings = JSON.parse(fs.readFileSync(config.json, 'utf8'));
+                } catch (e) {
+                    settings = {};
+                }
+            }
+
+            if (!settings.mcpServers) {
+                settings.mcpServers = {};
+            }
+
+            if (settings.mcpServers.stitch) {
+                result.alreadyInstalled = true;
+                if (settings.mcpServers.stitch.env?.GOOGLE_CLOUD_PROJECT !== projectId) {
+                    settings.mcpServers.stitch.env = { GOOGLE_CLOUD_PROJECT: projectId };
+                    fs.writeFileSync(config.json, JSON.stringify(settings, null, 2));
+                }
+                result.success = true;
+                result.method = 'file';
+                return result;
+            }
+
+            settings.mcpServers.stitch = {
+                command: 'npx',
+                args: ['-y', 'stitch-mcp-auto'],
+                env: { GOOGLE_CLOUD_PROJECT: projectId }
+            };
+
+            fs.writeFileSync(config.json, JSON.stringify(settings, null, 2));
+            result.success = true;
+            result.method = 'file';
+            console.log(`✅ ${cliName}: MCP settings installed: ${config.json}`);
+        } else if (config.toml) {
+            // TOML config (Codex)
+            const configDir = path.dirname(config.toml);
+            if (!fs.existsSync(configDir)) {
+                fs.mkdirSync(configDir, { recursive: true });
+            }
+
+            let tomlContent = '';
+            if (fs.existsSync(config.toml)) {
+                tomlContent = fs.readFileSync(config.toml, 'utf8');
+            }
+
+            // Check if stitch is already configured (any format)
+            if (tomlContent.includes('[mcp_servers.stitch]')) {
+                result.alreadyInstalled = true;
+
+                // Remove old stitch config (all formats) and add new one
+                // Match [mcp_servers.stitch] and optionally [mcp_servers.stitch.env] sections
+                tomlContent = tomlContent.replace(
+                    /\[mcp_servers\.stitch\][^\[]*(?:\[mcp_servers\.stitch\.env\][^\[]*)*/g,
+                    ''
+                ).trim();
+
+                // Add new stitch config with env section
+                const stitchToml = `
+
+[mcp_servers.stitch]
+command = "npx"
+args = ["-y", "stitch-mcp-auto"]
+
+[mcp_servers.stitch.env]
+GOOGLE_CLOUD_PROJECT = "${projectId}"
+`;
+                fs.writeFileSync(config.toml, tomlContent + stitchToml);
+                result.success = true;
+                result.method = 'file';
+                console.log(`✅ ${cliName}: MCP settings updated: ${config.toml}`);
+                return result;
+            }
+
+            const stitchToml = `
+
+[mcp_servers.stitch]
+command = "npx"
+args = ["-y", "stitch-mcp-auto"]
+
+[mcp_servers.stitch.env]
+GOOGLE_CLOUD_PROJECT = "${projectId}"
+`;
+            fs.writeFileSync(config.toml, tomlContent + stitchToml);
+            result.success = true;
+            result.method = 'file';
+            console.log(`✅ ${cliName}: MCP settings installed: ${config.toml}`);
+        }
+    } catch (e) {
+        result.error = e.message;
+        console.error(`❌ ${cliName}: Failed to install MCP settings: ${e.message}`);
     }
 
     return result;
@@ -1366,9 +1554,11 @@ async function startServer() {
             // Complete
             else if (pathname === '/complete') {
                 const skillsResult = saveTokens(setupState.selectedProject);
+                // Auto-install MCP settings for all CLIs
+                const mcpResults = saveAllMcpSettings(setupState.selectedProject);
                 console.log(`✅ ${t.consoleSetupComplete}: ${setupState.selectedProject}`);
                 res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-                res.end(completePage(skillsResult));
+                res.end(completePage(skillsResult, mcpResults));
 
                 // Close server
                 setTimeout(() => {

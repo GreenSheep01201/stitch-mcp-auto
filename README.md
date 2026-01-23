@@ -9,7 +9,7 @@
 One command setup, instant UI design generation. The most automated MCP server for Google Stitch.
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Version-1.1.0-blue" alt="Version">
+  <img src="https://img.shields.io/badge/Version-1.2.0-blue" alt="Version">
   <img src="https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux%20%7C%20WSL-blue" alt="Platform">
   <img src="https://img.shields.io/badge/License-Apache%202.0-green" alt="License">
   <img src="https://img.shields.io/badge/Node.js-18%2B-brightgreen" alt="Node.js">
@@ -206,7 +206,7 @@ This repo supports **semi-automated setup** with a few unavoidable manual steps 
 1. Run setup: `npm run setup` (or `npx -p stitch-mcp-auto stitch-mcp-auto-setup`)
 2. Open the URL shown in terminal (usually `http://localhost:51121`)
 3. Complete Google login in the browser (gcloud + Stitch API enable)
-4. Copy MCP config into your client (`.mcp.json` or Claude Desktop config)
+4. **⚠️ CRITICAL: Verify MCP registration** (see below)
 5. Start server: `npm start` or let the editor launch it
 
 **Manual-only steps:**
@@ -223,9 +223,34 @@ This repo supports **semi-automated setup** with a few unavoidable manual steps 
 - **WSL (Windows host):**
   - Run in Windows PowerShell: `Start-Process "http://localhost:51121"`
 
-**Verification (optional):**
+### ⚠️ Post-Installation MCP Verification (REQUIRED)
+
+After setup completes, **always verify** that the MCP server is registered:
+
+```bash
+# Claude Code
+claude mcp list | grep stitch
+
+# Gemini CLI
+gemini mcp list | grep stitch
+
+# Codex CLI
+codex mcp list | grep stitch
+```
+
+**If `stitch` is NOT listed**, manually register:
+
+| CLI | Manual Registration Command |
+|-----|----------------------------|
+| Claude Code | `claude mcp add -e GOOGLE_CLOUD_PROJECT=YOUR_PROJECT_ID -s user stitch -- npx -y stitch-mcp-auto` |
+| Gemini CLI | `gemini mcp add stitch -- npx -y stitch-mcp-auto --env GOOGLE_CLOUD_PROJECT=YOUR_PROJECT_ID` |
+| Codex CLI | `codex mcp add stitch -- npx -y stitch-mcp-auto --env GOOGLE_CLOUD_PROJECT=YOUR_PROJECT_ID` |
+
+> **Why verification is needed:** The setup wizard writes directly to config files (`~/.claude.json`, `~/.gemini/settings.json`, `~/.codex/config.toml`), but verification ensures the configuration is correct. Always verify to avoid "MCP server not found" errors.
+
+**Other Verification (optional):**
 - `node auth.js --status` (shows token + project status)
-- `npm start` (server boots and prints “Ready”)
+- `npm start` (server boots and prints "Ready")
 
 ---
 
@@ -288,6 +313,33 @@ After setup completes, add the configuration to your MCP client.
 
 #### Claude Code
 
+**🌐 Method 1: CLI Command (Recommended)**
+
+The setup wizard automatically writes to `~/.claude.json`.
+To add manually via CLI:
+
+```bash
+claude mcp add -e GOOGLE_CLOUD_PROJECT=YOUR_PROJECT_ID -s user stitch -- npx -y stitch-mcp-auto
+```
+
+Or edit `~/.claude.json` directly:
+
+```json
+{
+  "mcpServers": {
+    "stitch": {
+      "command": "npx",
+      "args": ["-y", "stitch-mcp-auto"],
+      "env": {
+        "GOOGLE_CLOUD_PROJECT": "YOUR_PROJECT_ID"
+      }
+    }
+  }
+}
+```
+
+**📁 Method 2: Per-project Settings**
+
 Create `.mcp.json` in your project root:
 
 ```json
@@ -302,6 +354,49 @@ Create `.mcp.json` in your project root:
     }
   }
 }
+```
+
+#### Gemini CLI
+
+**🌐 Method 1: CLI Command (Recommended)**
+
+```bash
+gemini mcp add stitch -- npx -y stitch-mcp-auto --env GOOGLE_CLOUD_PROJECT=YOUR_PROJECT_ID
+```
+
+Or edit `~/.gemini/settings.json` directly:
+
+```json
+{
+  "mcpServers": {
+    "stitch": {
+      "command": "npx",
+      "args": ["-y", "stitch-mcp-auto"],
+      "env": {
+        "GOOGLE_CLOUD_PROJECT": "YOUR_PROJECT_ID"
+      }
+    }
+  }
+}
+```
+
+#### Codex CLI
+
+**🌐 Method 1: CLI Command (Recommended)**
+
+```bash
+codex mcp add stitch -- npx -y stitch-mcp-auto --env GOOGLE_CLOUD_PROJECT=YOUR_PROJECT_ID
+```
+
+Or edit `~/.codex/config.toml` directly:
+
+```toml
+[mcp_servers.stitch]
+command = "npx"
+args = ["-y", "stitch-mcp-auto"]
+
+[mcp_servers.stitch.env]
+GOOGLE_CLOUD_PROJECT = "YOUR_PROJECT_ID"
 ```
 
 #### Cursor
@@ -861,6 +956,11 @@ stitch-mcp-auto/
 | `antigravity_tokens.json` | `~/.stitch-mcp-auto/` | Antigravity OAuth tokens (optional) |
 | `config.json` | `~/.stitch-mcp-auto/` | Project settings |
 | `.stitch-project.json` | Workspace root (current folder) | Auto-saved project mapping for this workspace |
+| **MCP Settings** | | |
+| `.claude.json` | `~/` | Claude Code MCP servers (user scope) |
+| `settings.json` | `~/.gemini/` | Gemini CLI MCP servers |
+| `config.toml` | `~/.codex/` | Codex CLI MCP servers (TOML format) |
+| **Commands** | | |
 | `commands/` | `~/.claude/commands/` | Claude Code Commands (auto-installed) |
 | `commands/stitch/` | `~/.gemini/commands/stitch/` | Gemini CLI Commands (auto-installed) |
 | `skills/stitch/` | `~/.codex/skills/stitch/` | Codex CLI Skills (auto-installed) |
