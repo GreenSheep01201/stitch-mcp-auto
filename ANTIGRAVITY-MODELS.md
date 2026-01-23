@@ -1,127 +1,127 @@
-# Antigravity OAuth - 지원 모델 목록
+# Antigravity OAuth - Supported Models
 
-Antigravity OAuth를 통해 Google Cloud Code API에 접근하면 다양한 AI 모델을 사용할 수 있습니다.
+By authenticating with Antigravity OAuth and accessing the Google Cloud Code API, you can use multiple AI models.
 
-## 인증 방법
+## Authentication
 
 ```bash
-# 인증 시작
+# Start authentication
 node test-auth.js
 ```
 
-브라우저에서 Google 계정으로 로그인하면 토큰이 자동 저장됩니다.
+Log in with your Google account in the browser; tokens are saved automatically.
 
 ---
 
-## 지원 모델 목록
+## Supported Models
 
-### Gemini 3 계열 (최신)
+### Gemini 3 Family (Latest)
 
-| 모델명 | 상태 | 이미지 생성 | 설명 |
-|--------|------|-------------|------|
-| `gemini-3-pro` | ✅ 사용 가능 | ✅ 지원 | 최신 Gemini 3 Pro 모델, 이미지 생성 지원 |
-| `gemini-3-flash` | ✅ 사용 가능 | ❌ 미지원 | 빠른 응답용 Gemini 3 Flash 모델 |
+| Model | Status | Image Generation | Description |
+|-------|--------|------------------|-------------|
+| `gemini-3-pro` | ✅ Available | ✅ Supported | Latest Gemini 3 Pro model with image generation |
+| `gemini-3-flash` | ✅ Available | ❌ Not supported | Fast-response Gemini 3 Flash model |
 
-### Gemini 2.5 계열
+### Gemini 2.5 Family
 
-| 모델명 | 상태 | 이미지 생성 | 설명 |
-|--------|------|-------------|------|
-| `gemini-2.5-pro` | ✅ 사용 가능 | ✅ 지원 | Gemini 2.5 Pro 모델 |
-| `gemini-2.5-flash` | ✅ 사용 가능 | ❌ 미지원 | 빠른 응답용 Gemini 2.5 Flash 모델 |
+| Model | Status | Image Generation | Description |
+|-------|--------|------------------|-------------|
+| `gemini-2.5-pro` | ✅ Available | ✅ Supported | Gemini 2.5 Pro model |
+| `gemini-2.5-flash` | ✅ Available | ❌ Not supported | Fast-response Gemini 2.5 Flash model |
 
-### Claude 계열 (Anthropic 프록시)
+### Claude Family (Anthropic Proxy)
 
-Antigravity API가 Anthropic API로 프록시하여 Claude 모델 사용 가능.
+Antigravity proxies to the Anthropic API to make Claude models available.
 
-| 모델명 | 상태 | 설명 |
-|--------|------|------|
-| `claude-sonnet-4-5-thinking` | ✅ 사용 가능 | Claude Sonnet 4.5 Thinking 모델 |
-| `claude-opus-4-5-thinking` | ✅ 사용 가능 | Claude Opus 4.5 Thinking 모델 |
-| `claude-sonnet-4-5` | ✅ 사용 가능 | Claude Sonnet 4.5 모델 |
-| `claude-opus-4-5` | ✅ 사용 가능 | Claude Opus 4.5 모델 |
+| Model | Status | Description |
+|-------|--------|-------------|
+| `claude-sonnet-4-5-thinking` | ✅ Available | Claude Sonnet 4.5 Thinking model |
+| `claude-opus-4-5-thinking` | ✅ Available | Claude Opus 4.5 Thinking model |
+| `claude-sonnet-4-5` | ✅ Available | Claude Sonnet 4.5 model |
+| `claude-opus-4-5` | ✅ Available | Claude Opus 4.5 model |
 
-### GPT 계열 (OpenAI 프록시)
+### GPT Family (OpenAI Proxy)
 
-Antigravity API가 OpenAI API로 프록시하여 GPT 모델 사용 가능.
+Antigravity proxies to the OpenAI API to make GPT models available.
 
-| 모델명 | 상태 | 설명 |
-|--------|------|------|
-| `gpt-5.2-codex` | ✅ 사용 가능 | GPT 5.2 Codex 모델 |
-| `gpt-5-codex` | ✅ 사용 가능 | GPT 5 Codex 모델 |
+| Model | Status | Description |
+|-------|--------|-------------|
+| `gpt-5.2-codex` | ✅ Available | GPT 5.2 Codex model |
+| `gpt-5-codex` | ✅ Available | GPT 5 Codex model |
 
 ---
 
-## Thinking 설정 (고급)
+## Thinking Settings (Advanced)
 
-### Claude 모델 Thinking Budget
+### Claude Model Thinking Budget
 
 | Tier | Budget (tokens) |
-|------|-----------------|
+|------|------------------|
 | low | 8,192 |
 | medium | 16,384 |
 | high | 32,768 |
 
-모델명에 `-low`, `-medium`, `-high` 접미사 추가:
+Add the `-low`, `-medium`, or `-high` suffix to the model name:
 - `claude-sonnet-4-5-thinking-low`
 - `claude-sonnet-4-5-thinking-high`
 
-### Gemini 3 모델 Thinking Level
+### Gemini 3 Model Thinking Level
 
-| 모델 | 지원 레벨 |
-|------|-----------|
+| Model | Supported Levels |
+|-------|------------------|
 | gemini-3-pro | low, high |
 | gemini-3-flash | minimal, low, medium, high |
 
-모델명에 접미사 추가:
+Add a suffix to the model name:
 - `gemini-3-pro-low`
 - `gemini-3-flash-high`
 
 ---
 
-## API 엔드포인트
+## API Endpoints
 
-| 환경 | URL | 설명 |
-|------|-----|------|
-| daily | `https://daily-cloudcode-pa.sandbox.googleapis.com` | 개발/테스트용 (일부 모델 404) |
-| autopush | `https://autopush-cloudcode-pa.sandbox.googleapis.com` | 사전 배포 환경 |
-| prod | `https://cloudcode-pa.googleapis.com` | 프로덕션 (권장) |
+| Environment | URL | Description |
+|-------------|-----|-------------|
+| daily | `https://daily-cloudcode-pa.sandbox.googleapis.com` | Dev/test (some models may return 404) |
+| autopush | `https://autopush-cloudcode-pa.sandbox.googleapis.com` | Pre-release environment |
+| prod | `https://cloudcode-pa.googleapis.com` | Production (recommended) |
 
-### 엔드포인트 선택 전략
+### Endpoint Selection Strategy
 
-1. **daily** 먼저 시도 (쿼터가 별도)
-2. **prod**로 fallback (메인 쿼터)
+1. Try **daily** first (separate quota).
+2. Fallback to **prod** (main quota).
 
 ---
 
-## 쿼터 정보
+## Quota Notes
 
-- 각 모델별로 개별 쿼터 적용
-- 쿼터 소진 시 429 에러 반환
-- 쿼터 리셋: 약 5시간마다 (모델별 상이)
+- Quotas are tracked per model.
+- When quota is exhausted, the API returns 429.
+- Quotas typically reset about every 5 hours (varies by model).
 
-### 쿼터 확인 방법
+### Check Quota Status
 
 ```bash
-# 모델별 쿼터 상태 확인
+# Check per-model quota status
 node test-models.js
 ```
 
-결과 해석:
-- ✅ 200 OK: 모델 작동 중
-- ⏳ 429 Rate Limited: 모델 존재, 쿼터 소진
-- ❌ 404 Not Found: 해당 엔드포인트에서 모델 미지원
+Result interpretation:
+- ✅ 200 OK: model is working
+- ⏳ 429 Rate Limited: model exists, quota exhausted
+- ❌ 404 Not Found: model not supported on that endpoint
 
 ---
 
-## 이미지 생성 사용법
+## Image Generation Usage
 
-### 지원 모델
+### Supported Models
 
-이미지 생성은 다음 모델에서만 지원됩니다:
-- `gemini-3-pro` (권장)
+Image generation is only supported on:
+- `gemini-3-pro` (recommended)
 - `gemini-2.5-pro`
 
-### 요청 예시
+### Request Example
 
 ```javascript
 const requestBody = {
@@ -142,24 +142,24 @@ const requestBody = {
 };
 ```
 
-### 응답에서 이미지 추출
+### Extract Image from Response
 
 ```javascript
 const data = await response.json();
-const responseData = data.response || data;  // Antigravity 응답 구조
+const responseData = data.response || data;  // Antigravity response shape
 const parts = responseData.candidates?.[0]?.content?.parts || [];
 
 for (const part of parts) {
     if (part.inlineData) {
         const imageBuffer = Buffer.from(part.inlineData.data, 'base64');
-        // imageBuffer를 파일로 저장하거나 처리
+        // Save or process imageBuffer
     }
 }
 ```
 
 ---
 
-## 참고 자료
+## References
 
-- [opencode-antigravity-auth](https://github.com/NoeFabris/opencode-antigravity-auth) - Antigravity OAuth 플러그인
-- [MODEL-VARIANTS.md](https://github.com/NoeFabris/opencode-antigravity-auth/blob/main/docs/MODEL-VARIANTS.md) - 모델 변형 설정
+- [opencode-antigravity-auth](https://github.com/NoeFabris/opencode-antigravity-auth) - Antigravity OAuth plugin
+- [MODEL-VARIANTS.md](https://github.com/NoeFabris/opencode-antigravity-auth/blob/main/docs/MODEL-VARIANTS.md) - Model variant settings

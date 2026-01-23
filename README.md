@@ -18,7 +18,7 @@ One command setup, instant UI design generation. The most automated MCP server f
 **Features:**
 - **Auto Setup** - One command installs everything (gcloud auth, API enable, MCP config)
 - **Multi-CLI Support** - Works with Claude Code, Gemini CLI, Codex CLI
-- **22 Professional Tools** - Design generation, accessibility checks, design system export, AI image generation
+- **19 Custom Tools + Stitch Core** - Design generation, accessibility checks, tokens, responsive variants, and design system export
 - **7 Workflow Commands** - `/design`, `/design-system`, `/design-flow`, `/design-qa`, `/design-export`, `/generate-asset`, `/design-full`
 - **🎨 AI Image Generation** - Generate logos, icons, hero images via Gemini 3 Pro (optional Antigravity OAuth)
 - **🎭 Orchestration Mode** - One prompt to generate assets + complete UI design
@@ -28,16 +28,59 @@ One command setup, instant UI design generation. The most automated MCP server f
 
 ## Table of Contents
 
-- [Quick Start (1 minute)](#-quick-start-1-minute)
-- [Manual Installation](#-manual-installation)
-  - [Step 1: Install Google Cloud CLI](#step-1-install-google-cloud-cli)
-  - [Step 2: Run Auto Setup](#step-2-run-auto-setup)
+- [Prerequisites (Install These First)](#prerequisites-install-these-first)
+  - [1. Install Node.js (v18 or higher)](#1-install-nodejs-v18-or-higher)
+  - [2. Install Google Cloud CLI (gcloud)](#2-install-google-cloud-cli-gcloud)
+- [Quick Start](#quick-start)
+- [AI Agent Quick Start (Semi-Automated)](#ai-agent-quick-start-semi-automated)
+- [Manual Installation (Alternative)](#manual-installation-alternative)
+  - [Step 1: Run Auto Setup](#step-1-run-auto-setup)
   - [Step 3: Configure MCP Client](#step-3-configure-mcp-client)
-- [Available Tools](#-available-tools)
-- [Claude Code Skills](#-claude-code-skills)
-- [Usage Examples](#-usage-examples)
-- [Troubleshooting](#-troubleshooting)
-- [Architecture](#-architecture)
+- [Available Tools](#available-tools)
+  - [Automatic Project Management (NEW)](#automatic-project-management-new)
+  - [Core Stitch Tools (API + convenience wrappers)](#core-stitch-tools-api--convenience-wrappers)
+  - [Professional Web Design Tools](#professional-web-design-tools)
+    - [Design Consistency Tools](#design-consistency-tools)
+    - [Productivity Tools](#productivity-tools)
+    - [Quality & Analysis Tools](#quality--analysis-tools)
+    - [Design Enhancement Tools](#design-enhancement-tools)
+  - [AI Image Generation Tools (v1.1.0)](#ai-image-generation-tools-v110)
+    - [Supported Models for Image Generation](#supported-models-for-image-generation)
+    - [Background Removal (NEW)](#background-removal-new)
+- [MCP Prompts (Auto-Discovered)](#mcp-prompts-auto-discovered)
+- [Custom Commands (Multi-CLI Support)](#custom-commands-multi-cli-support)
+  - [Supported CLIs](#supported-clis)
+  - [Available Commands](#available-commands)
+  - [CLI Usage Examples](#cli-usage-examples)
+  - [Commands Installation Location](#commands-installation-location)
+- [Usage Examples](#usage-examples)
+  - [Create a New Project](#create-a-new-project)
+  - [Generate a Screen](#generate-a-screen)
+  - [Generate with Specific Style](#generate-with-specific-style)
+  - [Multi-language Support](#multi-language-support)
+  - [The "Designer Flow"](#the-designer-flow)
+  - [Using Design Tokens](#using-design-tokens)
+  - [Trending Design Generation](#trending-design-generation)
+  - [Batch Screen Generation](#batch-screen-generation)
+  - [Accessibility Check](#accessibility-check)
+  - [Design System Export](#design-system-export)
+  - [AI Image Generation (NEW in v1.1.0)](#ai-image-generation-new-in-v110)
+  - [Full Design Orchestration (NEW in v1.1.0)](#full-design-orchestration-new-in-v110)
+- [Troubleshooting](#troubleshooting)
+  - ["gcloud: command not found"](#gcloud-command-not-found)
+  - ["Stitch API has not been used in project" Error](#stitch-api-has-not-been-used-in-project-error)
+  - [Token Expired / Authentication Error](#token-expired--authentication-error)
+  - ["Connection Refused" After Google Login](#connection-refused-after-google-login)
+  - [Browser Doesn't Open Automatically (WSL)](#browser-doesnt-open-automatically-wsl)
+  - [Full Reset](#full-reset)
+- [Architecture](#architecture)
+  - [File Structure](#file-structure)
+  - [Configuration Files](#configuration-files)
+- [Scripts](#scripts)
+- [Requirements](#requirements)
+- [License](#license)
+- [Credits](#credits)
+- [Support](#support)
 
 ---
 
@@ -141,13 +184,48 @@ The setup wizard will:
 4. Enable the Stitch API
 5. Save your configuration
 
+> **Note:** When starting the MCP server directly (`npx stitch-mcp-auto` or via your editor), the setup wizard runs on `http://localhost:8086`.
+
 > **🤖 AI Agent Note (WSL Environment):**
-> If running in WSL, the browser cannot open automatically. You MUST open the URL in Windows browser using PowerShell:
+> If running in WSL, the browser cannot open automatically. Open the URL shown in the terminal (usually `http://localhost:51121` for `setup.js`, or `http://localhost:8086` when the MCP server starts) in your Windows browser:
 > ```powershell
 > # Run this in PowerShell (not WSL terminal)
 > Start-Process "http://localhost:51121"
+> # If you see 8086 instead:
+> Start-Process "http://localhost:8086"
 > ```
-> Or instruct the user to manually open `http://localhost:51121` in their Windows browser.
+> Or instruct the user to manually open the shown URL in their Windows browser.
+
+---
+
+## AI Agent Quick Start (Semi-Automated)
+
+This repo supports **semi-automated setup** with a few unavoidable manual steps (OAuth login).
+
+**Checklist (agent-friendly):**
+1. Run setup: `npm run setup` (or `npx -p stitch-mcp-auto stitch-mcp-auto-setup`)
+2. Open the URL shown in terminal (usually `http://localhost:51121`)
+3. Complete Google login in the browser (gcloud + Stitch API enable)
+4. Copy MCP config into your client (`.mcp.json` or Claude Desktop config)
+5. Start server: `npm start` or let the editor launch it
+
+**Manual-only steps:**
+- Browser OAuth consent (Google login)
+- WSL browser opening (must open URL manually)
+
+**Environment-specific commands:**
+- **Windows (PowerShell):**
+  - Open setup URL: `Start-Process "http://localhost:51121"` (or `http://localhost:8086`)
+- **macOS:**
+  - Open setup URL: `open "http://localhost:51121"` (or `http://localhost:8086`)
+- **Linux:**
+  - Open setup URL: `xdg-open "http://localhost:51121"` (or `http://localhost:8086`)
+- **WSL (Windows host):**
+  - Run in Windows PowerShell: `Start-Process "http://localhost:51121"`
+
+**Verification (optional):**
+- `node auth.js --status` (shows token + project status)
+- `npm start` (server boots and prints “Ready”)
 
 ---
 
@@ -233,6 +311,8 @@ Go to **Settings > MCP > Add New Server** and add:
 - Args: `-y stitch-mcp-auto`
 - Environment: `GOOGLE_CLOUD_PROJECT=YOUR_PROJECT_ID`
 
+**Optional:** `GOOGLE_CLOUD_PROJECT` is only used for Stitch image fallback and `auth.js --status`. The setup wizard stores the active project in `~/.stitch-mcp-auto/config.json`, and workspace tools save `.stitch-project.json` in your current folder.
+
 ---
 
 ## Available Tools
@@ -248,12 +328,12 @@ Go to **Settings > MCP > Add New Server** and add:
 **How it works:**
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│  Tool called without projectId                               │
-│                    ↓                                         │
+│  Tool called without projectId                              │
+│                      ↓                                      │
 │  1. Check active session project                            │
 │  2. If none → Load from .stitch-project.json                │
 │  3. If none → Return "PROJECT_REQUIRED" with options        │
-│                    ↓                                         │
+│                      ↓                                      │
 │  User creates/selects project → Auto-saved to workspace     │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -266,7 +346,7 @@ Go to **Settings > MCP > Add New Server** and add:
 | `set_workspace_project` | 💾 Manually associate a project with the workspace |
 | `clear_workspace_project` | 🗑️ Clear workspace project association |
 
-### Core Stitch API Tools
+### Core Stitch Tools (API + convenience wrappers)
 
 | Tool | Description |
 |------|-------------|
@@ -318,7 +398,7 @@ These tools have different authentication requirements:
 
 | Tool | Auth Required | Description |
 |------|---------------|-------------|
-| `generate_design_asset` | **Antigravity** | Generate design assets (logo, icon, illustration, hero image, wireframe) using Gemini models. **Requires Antigravity authentication.** Supports model selection (gemini-3-pro, gemini-2.5-pro). |
+| `generate_design_asset` | **Antigravity** | Generate design assets (logo, icon, illustration, hero, wireframe, background, pattern) using Gemini models. **Requires Antigravity authentication.** Supports model selection (gemini-3-pro, gemini-2.5-pro) and forced auth. |
 | `orchestrate_design` | Stitch + Antigravity | Full orchestration: auto-generates assets (logo, icons, hero) then creates complete UI. Stitch-only users can generate UI pages without custom assets. |
 | `check_antigravity_auth` | None | Check Antigravity OAuth authentication status for image generation features. |
 
@@ -328,8 +408,8 @@ These tools have different authentication requirements:
 |-------|--------|------------------|-------------|
 | `gemini-3-pro` | ✅ Available | ✅ Supported | **Default.** Latest Gemini 3 Pro model with image generation |
 | `gemini-2.5-pro` | ✅ Available | ✅ Supported | Gemini 2.5 Pro model with image generation |
-| `gemini-3-flash` | ✅ Available | ❌ Text only | Fast response model, no image generation |
-| `gemini-2.5-flash` | ✅ Available | ❌ Text only | Fast response model, no image generation |
+
+> **See also:** `ANTIGRAVITY-MODELS.md` (EN) / `ANTIGRAVITY-MODELS.ko.md` (KO) for the full model list, thinking variants, and endpoint details.
 
 > **💡 Model Selection:**
 > You can specify a model when calling `generate_design_asset`:
@@ -340,6 +420,12 @@ These tools have different authentication requirements:
 >   "model": "gemini-3-pro"
 > }
 > ```
+
+**Key parameters (`generate_design_asset`):**
+- `assetType`: logo, icon, illustration, hero, wireframe, background, pattern
+- `aspectRatio`: 1:1, 16:9, 9:16, 4:3, 3:4
+- `saveToFile`: `true` by default (saves to current directory)
+- `forceAntigravityAuth`: `true` to trigger browser login
 
 > **📋 Role Separation:**
 > - **Stitch API (gcloud auth):** UI page/screen generation - available to all users
@@ -424,7 +510,7 @@ When you run `npx -p stitch-mcp-auto stitch-mcp-auto-setup`, the setup wizard au
 | generate-asset | `/generate-asset` | `/stitch:generate-asset` | `$stitch-generate-asset` | AI image generation (v1.1.0) |
 | design-full | `/design-full` | `/stitch:design-full` | `$stitch-design-full` | Full orchestration mode (v1.1.0) |
 
-### Usage Examples
+### CLI Usage Examples
 
 **Claude Code:**
 ```bash
@@ -718,12 +804,12 @@ npx -p stitch-mcp-auto stitch-mcp-auto-setup
 │  │ (Auto Setup)│  │ (MCP Server)│  │ (OAuth)     │           │
 │  └─────────────┘  └─────────────┘  └─────────────┘           │
 │                          │                                   │
-│           ┌──────────────┼──────────────┐                   │
-│           ▼              ▼              ▼                   │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐          │
-│  │ UI Design   │  │ Image Gen   │  │ Orchestrate │          │
-│  │ (19 tools)  │  │ (3 tools)   │  │ (combined)  │          │
-│  └─────────────┘  └─────────────┘  └─────────────┘          │
+│           ┌──────────────┼──────────────┐                    │
+│           ▼              ▼              ▼                    │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐           │
+│  │ Design Tools│  │ Image Gen   │  │ Orchestrate │           │
+│  │ (UI + QA)   │  │ (Antigrav.) │  │ (assets+UI) │           │
+│  └─────────────┘  └─────────────┘  └─────────────┘           │
 └──────────────────────────────────────────────────────────────┘
                               │
             ┌─────────────────┼─────────────────┐
@@ -748,12 +834,16 @@ npx -p stitch-mcp-auto stitch-mcp-auto-setup
 
 ```
 stitch-mcp-auto/
-├── index.js          # Main MCP server (with Antigravity OAuth)
-├── setup.js          # Web-based auto setup wizard
-├── auth.js           # OAuth helper utilities
-├── package.json      # Dependencies and scripts
-├── README.md         # This documentation
-└── skills/           # Claude Code Skills
+├── index.js               # Main MCP server (with Antigravity OAuth)
+├── setup.js               # Web-based auto setup wizard
+├── auth.js                # OAuth helper utilities
+├── package.json           # Dependencies and scripts
+├── README.md              # Documentation (EN)
+├── README.ko.md           # Documentation (KO)
+├── ANTIGRAVITY-MODELS.md  # Antigravity model list (EN)
+├── ANTIGRAVITY-MODELS.ko.md # Antigravity model list (KO)
+├── AGENTS.md              # Repository guidelines
+└── skills/                # Command sources (Claude/Gemini/Codex)
     ├── design.md
     ├── design-system.md
     ├── design-flow.md
@@ -770,6 +860,7 @@ stitch-mcp-auto/
 | `tokens.json` | `~/.stitch-mcp-auto/` | OAuth access tokens (gcloud) |
 | `antigravity_tokens.json` | `~/.stitch-mcp-auto/` | Antigravity OAuth tokens (optional) |
 | `config.json` | `~/.stitch-mcp-auto/` | Project settings |
+| `.stitch-project.json` | Workspace root (current folder) | Auto-saved project mapping for this workspace |
 | `commands/` | `~/.claude/commands/` | Claude Code Commands (auto-installed) |
 | `commands/stitch/` | `~/.gemini/commands/stitch/` | Gemini CLI Commands (auto-installed) |
 | `skills/stitch/` | `~/.codex/skills/stitch/` | Codex CLI Skills (auto-installed) |
@@ -780,11 +871,16 @@ stitch-mcp-auto/
 
 | Command | Description |
 |---------|-------------|
+| `npm start` | Start MCP server (`node index.js`) |
+| `npm run setup` | Run setup wizard (`node setup.js`, opens `http://localhost:51121`) |
+| `npm run auth -- --status|--login|--logout|--setup|--project <id>` | OAuth helper commands |
 | `npx -p stitch-mcp-auto stitch-mcp-auto-setup` | Run interactive setup wizard |
 | `npx stitch-mcp-auto` | Start MCP server (used by editors) |
 | `node auth.js --status` | Check authentication status |
 | `node auth.js --login` | Manual login |
 | `node auth.js --logout` | Clear saved tokens |
+| `node auth.js --setup` | Show OAuth setup guide |
+| `node auth.js --project <id>` | Save project ID (optional) |
 
 ---
 
@@ -805,7 +901,7 @@ stitch-mcp-auto/
 
 ## Credits
 
-- **Author:** [Wongil Seo](https://github.com/GreenSheep01201)
+- **Author:** [GreenSheep01201 (Wongil Seo)](https://github.com/GreenSheep01201)
 - **Based on:** [stitch-mcp](https://github.com/Kargatharaakash/stitch-mcp) by [Kargatharaakash](https://github.com/Kargatharaakash)
 - **Concept:** Automated implementation of the MCP (Model Context Protocol) file stitching system.
 
