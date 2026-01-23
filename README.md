@@ -1,26 +1,42 @@
-# Stitch MCP Auto
+# Stitch MCP Auto 🎨
 
 **[English](README.md)** | **[한국어](README.ko.md)**
 
-> **Just let AI handle everything.** - AI에게 모든 걸 맡기세요.
+> **One command. Instant UI.**
+> The most automated MCP server for Google Stitch.
 
 **💡 Just share this link with your AI:** `https://github.com/GreenSheep01201/stitch-mcp-auto`
 
-One command setup, instant UI design generation. The most automated MCP server for Google Stitch.
-
 <p align="center">
-  <img src="https://img.shields.io/badge/Version-1.2.0-blue" alt="Version">
+  <a href="https://www.npmjs.com/package/stitch-mcp-auto"><img src="https://img.shields.io/npm/v/stitch-mcp-auto" alt="npm"></a>
+  <a href="https://www.npmjs.com/package/stitch-mcp-auto"><img src="https://img.shields.io/npm/dm/stitch-mcp-auto" alt="Downloads"></a>
+  <a href="https://github.com/GreenSheep01201/stitch-mcp-auto/stargazers"><img src="https://img.shields.io/github/stars/GreenSheep01201/stitch-mcp-auto" alt="GitHub stars"></a>
   <img src="https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux%20%7C%20WSL-blue" alt="Platform">
   <img src="https://img.shields.io/badge/License-Apache%202.0-green" alt="License">
   <img src="https://img.shields.io/badge/Node.js-18%2B-brightgreen" alt="Node.js">
 </p>
+
+---
+
+## Why stitch-mcp-auto?
+
+| Feature | stitch-mcp | stitch-mcp-auto |
+|---------|------------|-----------------|
+| Setup time | ~30 min (manual) | ~2 min (wizard) |
+| gcloud config | Manual | Automatic |
+| MCP registration | Manual | Automatic |
+| Multi-CLI support | ❌ | ✅ Claude/Gemini/Codex |
+| AI image generation | ❌ | ✅ Gemini 3 Pro |
+| Custom commands | ❌ | ✅ 7 workflows |
+
+---
 
 **Features:**
 - **Auto Setup** - One command installs everything (gcloud auth, API enable, MCP config)
 - **Multi-CLI Support** - Works with Claude Code, Gemini CLI, Codex CLI
 - **19 Custom Tools + Stitch Core** - Design generation, accessibility checks, tokens, responsive variants, and design system export
 - **7 Workflow Commands** - `/design`, `/design-system`, `/design-flow`, `/design-qa`, `/design-export`, `/generate-asset`, `/design-full`
-- **🎨 AI Image Generation** - Generate logos, icons, hero images via Gemini 3 Pro (optional Antigravity OAuth)
+- **🎨 AI Image Generation** - Generate logos, icons, hero images via Gemini 3 Pro (uses [Antigravity](#ai-image-generation-tools-v110) - Google's experimental image generation API)
 - **🎭 Orchestration Mode** - One prompt to generate assets + complete UI design
 - **🌐 i18n Support** - Auto-detects system language (English/Korean) for setup wizard and console messages
 
@@ -28,6 +44,7 @@ One command setup, instant UI design generation. The most automated MCP server f
 
 ## Table of Contents
 
+- [Why stitch-mcp-auto?](#why-stitch-mcp-auto)
 - [Prerequisites (Install These First)](#prerequisites-install-these-first)
   - [1. Install Node.js (v18 or higher)](#1-install-nodejs-v18-or-higher)
   - [2. Install Google Cloud CLI (gcloud)](#2-install-google-cloud-cli-gcloud)
@@ -78,6 +95,7 @@ One command setup, instant UI design generation. The most automated MCP server f
   - [Configuration Files](#configuration-files)
 - [Scripts](#scripts)
 - [Requirements](#requirements)
+- [Security Note](#security-note)
 - [License](#license)
 - [Credits](#credits)
 - [Support](#support)
@@ -174,7 +192,7 @@ gcloud --version
 After installing Node.js and gcloud CLI:
 
 ```bash
-npx -p stitch-mcp-auto stitch-mcp-auto-setup
+npx stitch-mcp-auto-setup
 ```
 
 The setup wizard will:
@@ -955,7 +973,7 @@ stitch-mcp-auto/
 | `tokens.json` | `~/.stitch-mcp-auto/` | OAuth access tokens (gcloud) |
 | `antigravity_tokens.json` | `~/.stitch-mcp-auto/` | Antigravity OAuth tokens (optional) |
 | `config.json` | `~/.stitch-mcp-auto/` | Project settings |
-| `.stitch-project.json` | Workspace root (current folder) | Auto-saved project mapping for this workspace |
+| `.stitch-project.json` | Workspace root (where you run the AI CLI) | Auto-saved project mapping for this workspace |
 | **MCP Settings** | | |
 | `.claude.json` | `~/` | Claude Code MCP servers (user scope) |
 | `settings.json` | `~/.gemini/` | Gemini CLI MCP servers |
@@ -990,6 +1008,12 @@ stitch-mcp-auto/
 - **Google Cloud CLI:** Latest version
 - **Google Account:** With access to Google Cloud Console
 - **MCP Client:** Claude Desktop, Claude Code, Cursor, or compatible editor
+
+---
+
+## Security Note
+
+This project uses Google's public OAuth client for authentication. Client IDs visible in the source code are **intentionally public** (Desktop App type per OAuth 2.0 spec). Your tokens are stored locally in `~/.stitch-mcp-auto/` and never transmitted to third parties.
 
 ---
 

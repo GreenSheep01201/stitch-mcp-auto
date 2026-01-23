@@ -1,26 +1,42 @@
-# Stitch MCP Auto
+# Stitch MCP Auto 🎨
 
 **[English](README.md)** | **[한국어](README.ko.md)**
 
-> **Just let AI handle everything.** - AI에게 모든 걸 맡기세요.
+> **한 번의 명령. 즉각적인 UI.**
+> Google Stitch를 위한 가장 자동화된 MCP 서버.
 
 **💡 AI에게 이 링크만 전달하세요:** `https://github.com/GreenSheep01201/stitch-mcp-auto`
 
-한 번의 명령으로 설정 완료, 즉각적인 UI 디자인 생성. Google Stitch를 위한 가장 자동화된 MCP 서버.
-
 <p align="center">
-  <img src="https://img.shields.io/badge/Version-1.2.0-blue" alt="Version">
+  <a href="https://www.npmjs.com/package/stitch-mcp-auto"><img src="https://img.shields.io/npm/v/stitch-mcp-auto" alt="npm"></a>
+  <a href="https://www.npmjs.com/package/stitch-mcp-auto"><img src="https://img.shields.io/npm/dm/stitch-mcp-auto" alt="Downloads"></a>
+  <a href="https://github.com/GreenSheep01201/stitch-mcp-auto/stargazers"><img src="https://img.shields.io/github/stars/GreenSheep01201/stitch-mcp-auto" alt="GitHub stars"></a>
   <img src="https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux%20%7C%20WSL-blue" alt="Platform">
   <img src="https://img.shields.io/badge/License-Apache%202.0-green" alt="License">
   <img src="https://img.shields.io/badge/Node.js-18%2B-brightgreen" alt="Node.js">
 </p>
+
+---
+
+## 왜 stitch-mcp-auto인가?
+
+| 기능 | stitch-mcp | stitch-mcp-auto |
+|------|------------|-----------------|
+| 설정 시간 | ~30분 (수동) | ~2분 (마법사) |
+| gcloud 설정 | 수동 | 자동 |
+| MCP 등록 | 수동 | 자동 |
+| 다중 CLI 지원 | ❌ | ✅ Claude/Gemini/Codex |
+| AI 이미지 생성 | ❌ | ✅ Gemini 3 Pro |
+| 커스텀 명령어 | ❌ | ✅ 7개 워크플로우 |
+
+---
 
 **주요 기능:**
 - **자동 설정** - 한 번의 명령으로 모든 것을 설치 (gcloud 인증, API 활성화, MCP 설정)
 - **다중 CLI 지원** - Claude Code, Gemini CLI, Codex CLI에서 모두 작동
 - **커스텀 19개 도구 + Stitch 핵심 기능** - 디자인 생성, 접근성 검사, 토큰/반응형, 디자인 시스템 내보내기
 - **7개 워크플로우 명령** - `/design`, `/design-system`, `/design-flow`, `/design-qa`, `/design-export`, `/generate-asset`, `/design-full`
-- **🎨 AI 이미지 생성** - Gemini 3 Pro를 통한 로고, 아이콘, 히어로 이미지 생성 (Antigravity OAuth 선택사항)
+- **🎨 AI 이미지 생성** - Gemini 3 Pro를 통한 로고, 아이콘, 히어로 이미지 생성 ([Antigravity](#ai-이미지-생성-도구-v110) - Google의 실험적 이미지 생성 API)
 - **🎭 오케스트레이션 모드** - 한 번의 프롬프트로 에셋 생성 + 완전한 UI 디자인
 - **🌐 다국어 지원** - 시스템 언어 자동 감지 (영어/한국어) - 설정 마법사 및 콘솔 메시지
 
@@ -28,6 +44,7 @@
 
 ## 목차
 
+- [왜 stitch-mcp-auto인가?](#왜-stitch-mcp-auto인가)
 - [사전 요구사항 (먼저 설치하세요)](#사전-요구사항-먼저-설치하세요)
   - [1. Node.js 설치 (v18 이상)](#1-nodejs-설치-v18-이상)
   - [2. Google Cloud CLI (gcloud) 설치](#2-google-cloud-cli-gcloud-설치)
@@ -78,6 +95,7 @@
   - [설정 파일](#설정-파일)
 - [스크립트](#스크립트)
 - [요구 사항](#요구-사항)
+- [보안 안내](#보안-안내)
 - [라이선스](#라이선스)
 - [크레딧](#크레딧)
 - [지원](#지원)
@@ -174,7 +192,7 @@ gcloud --version
 Node.js와 gcloud CLI 설치 후:
 
 ```bash
-npx -p stitch-mcp-auto stitch-mcp-auto-setup
+npx stitch-mcp-auto-setup
 ```
 
 설정 마법사가 자동으로:
@@ -955,7 +973,7 @@ stitch-mcp-auto/
 | `tokens.json` | `~/.stitch-mcp-auto/` | OAuth 액세스 토큰 (gcloud) |
 | `antigravity_tokens.json` | `~/.stitch-mcp-auto/` | Antigravity OAuth 토큰 (선택사항) |
 | `config.json` | `~/.stitch-mcp-auto/` | 프로젝트 설정 |
-| `.stitch-project.json` | 워크스페이스 루트(현재 폴더) | 워크스페이스용 프로젝트 매핑(자동 저장) |
+| `.stitch-project.json` | 워크스페이스 루트(AI CLI 실행 폴더) | 워크스페이스용 프로젝트 매핑(자동 저장) |
 | **MCP 설정** | | |
 | `.claude.json` | `~/` | Claude Code MCP 서버 (user scope) |
 | `settings.json` | `~/.gemini/` | Gemini CLI MCP 서버 |
@@ -990,6 +1008,12 @@ stitch-mcp-auto/
 - **Google Cloud CLI:** 최신 버전
 - **Google 계정:** Google Cloud Console 접근 권한 필요
 - **MCP 클라이언트:** Claude Desktop, Claude Code, Cursor 또는 호환 에디터
+
+---
+
+## 보안 안내
+
+이 프로젝트는 인증을 위해 Google의 공개 OAuth 클라이언트를 사용합니다. 소스 코드에 보이는 클라이언트 ID는 **의도적으로 공개된 것**입니다 (OAuth 2.0 스펙에 따른 Desktop App 타입). 토큰은 `~/.stitch-mcp-auto/`에 로컬로 저장되며 제3자에게 전송되지 않습니다.
 
 ---
 
