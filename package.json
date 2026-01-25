@@ -1,6 +1,6 @@
 {
     "name": "stitch-mcp-auto",
-    "version": "1.2.0",
+    "version": "1.2.1",
     "description": "Just let AI handle everything. Universal MCP server for Google Stitch with auto-setup, multi-CLI commands, professional design workflows, and AI image generation via Antigravity/Gemini 3 Pro.",
     "main": "index.js",
     "bin": {
