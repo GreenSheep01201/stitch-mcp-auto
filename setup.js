@@ -1122,9 +1122,10 @@ function saveMcpSettingsForCli(cliName, projectId) {
                 result.alreadyInstalled = true;
 
                 // Remove old stitch config (all formats) and add new one
-                // Match [mcp_servers.stitch] and optionally [mcp_servers.stitch.env] sections
+                // Use a safer regex that handles array brackets like args = ["-y", ...]
+                // Match from [mcp_servers.stitch] until next section or end of file
                 tomlContent = tomlContent.replace(
-                    /\[mcp_servers\.stitch\][^\[]*(?:\[mcp_servers\.stitch\.env\][^\[]*)*/g,
+                    /\[mcp_servers\.stitch\][\s\S]*?(?=\n\[(?!mcp_servers\.stitch)|$)/g,
                     ''
                 ).trim();
 
