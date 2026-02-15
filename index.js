@@ -294,7 +294,8 @@ function getGcloudPath() {
     for (const p of paths) {
         try {
             if (fs.existsSync(p)) return p;
-            execSync(`which "${p}" 2>/dev/null || where "${p}" 2>nul`, { encoding: 'utf8', stdio: 'pipe' });
+            const findCmd = process.platform === 'win32' ? `where "${p}" 2>nul` : `which "${p}" 2>/dev/null`;
+            execSync(findCmd, { encoding: 'utf8', stdio: 'pipe' });
             return p;
         } catch (e) {}
     }
@@ -306,7 +307,10 @@ function getGcloudToken() {
     if (!gcloudPath) return null;
 
     try {
-        const token = execSync(`"${gcloudPath}" auth print-access-token 2>/dev/null || "${gcloudPath}" auth print-access-token 2>nul`, {
+        const tokenCmd = process.platform === 'win32'
+            ? `"${gcloudPath}" auth print-access-token 2>nul`
+            : `"${gcloudPath}" auth print-access-token 2>/dev/null`;
+        const token = execSync(tokenCmd, {
             encoding: 'utf8',
             stdio: 'pipe',
             timeout: 10000
